@@ -18,6 +18,7 @@ from mcp_kb.config import Settings
 from mcp_kb.evals.llm import Generate
 from mcp_kb.searcher import _get_collection, search
 
+PROMPT_VERSION = 2  # 1: "use your own words"; 2: "phrase it like someone who has not read it"
 MIN_WORDS = 12  # chunks shorter than this are mostly headings or fragments
 MAX_OVERLAP = 0.75  # ponytail: fixed cut-off; tune if review shows good questions being dropped
 STOPWORDS = set(
@@ -26,7 +27,7 @@ STOPWORDS = set(
     "as that this these those my our your their me us there here if then than so about into over any some all "
     "each every get got have has had".split())
 
-ANSWERABLE_PROMPT = '''You are helping test a search engine over a team's internal documentation.
+ANSWERABLE_V1 = '''You are helping test a search engine over a team's internal documentation.
 Read the passage and write ONE question a colleague might ask that this passage answers.
 Rules:
 - ask about a specific fact in the passage
@@ -37,6 +38,22 @@ Passage:
 """{text}"""
 
 Reply with JSON only: {{"question": "..."}}'''
+
+ANSWERABLE_V2 = '''You are helping test a search engine over a team's internal documentation.
+Read the passage and write ONE question that this passage answers, phrased the way a colleague who
+has NOT read it would ask: they know what they need, but not the passage's exact terms.
+Rules:
+- ask about one specific fact in the passage
+- use everyday words and synonyms instead of the passage's technical terms, names and phrases
+- keep it short (under 20 words)
+- do not mention "the passage", "the document" or "the text"
+
+Passage:
+"""{text}"""
+
+Reply with JSON only: {{"question": "..."}}'''
+
+ANSWERABLE_PROMPTS = {1: ANSWERABLE_V1, 2: ANSWERABLE_V2}
 
 UNANSWERABLE_PROMPT = '''You are helping test a search engine over a team's internal documentation.
 Read the passage and write ONE question on the same topic that a colleague might plausibly ask,
@@ -100,7 +117,7 @@ def sample_chunks(settings: Settings, n: int, seed: int) -> list[dict]:
 
 
 def generate_gold(settings: Settings, generate: Generate, n: int = 50, seed: int = 0,
-                  log=lambda msg: None) -> tuple[list[dict], dict]:
+                  log=lambda msg: None, prompt_version: int = PROMPT_VERSION) -> tuple[list[dict], dict]:
     """Return (gold items, filter stats). Items: {question, answerable, source, start_line, end_line}."""
     stats = dict.fromkeys(["chunks", "answerable_written", "dropped_overlap", "dropped_not_answered",
                            "unanswerable_written", "dropped_answered_elsewhere", "dropped_duplicate"], 0)
@@ -113,7 +130,7 @@ def generate_gold(settings: Settings, generate: Generate, n: int = 50, seed: int
         log(f"[{i}/{len(chunks)}] {c['source']}:L{c['start_line']}")
         body = _body(c["text"])
 
-        q = _question(generate(ANSWERABLE_PROMPT.format(text=body)))
+        q = _question(generate(ANSWERABLE_PROMPTS[prompt_version].format(text=body)))
         if q:
             stats["answerable_written"] += 1
             if q.lower() in seen:

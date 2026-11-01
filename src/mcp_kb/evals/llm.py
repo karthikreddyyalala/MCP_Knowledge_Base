@@ -4,7 +4,7 @@ import urllib.error
 import urllib.request
 from typing import Callable
 
-DEFAULT_MODEL = "llama3.2:3b"
+DEFAULT_MODEL = "qwen2.5:7b"
 DEFAULT_HOST = "http://localhost:11434"
 INSTALL_HINT = ("Install ollama from https://ollama.com, start it, then run: ollama pull {model}\n"
                 "kb eval needs it only to write test questions; search itself never uses an LLM.")

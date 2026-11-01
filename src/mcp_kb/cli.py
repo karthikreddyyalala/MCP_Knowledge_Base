@@ -105,7 +105,7 @@ def eval_(
     docs: Path = typer.Argument(..., exists=True, file_okay=False, help="Folder of .md/.txt docs"),
     db: Path = DbOption,
     n: int = typer.Option(50, "--n", help="Chunks to sample; each yields up to 2 questions"),
-    model: str = typer.Option("llama3.2:3b", "--model", help="Ollama model that writes the questions"),
+    model: str = typer.Option("qwen2.5:7b", "--model", help="Ollama model that writes the questions"),
     gold: Optional[Path] = typer.Option(None, "--gold", help="Reuse a saved gold.jsonl instead of generating"),
     review: bool = typer.Option(False, "--review", help="Spot-check 10 questions by hand"),
     save_threshold: bool = typer.Option(False, "--save-threshold", help="Use the calibrated threshold from now on"),
@@ -153,6 +153,37 @@ def eval_(
         t = report["abstention"]["min_answered_0.97"]["threshold"]
         save_calibration(db, t, source=f"kb eval on {docs.resolve()} ({report['n_answerable']} + {report['n_unanswerable']} questions)")
         typer.echo(f"Saved not-found threshold {t} for this index; kb search and kb serve will use it.")
+
+
+@app.command("validate-eval")
+def validate_eval(
+    dataset: str = typer.Option("scifact", "--dataset"),
+    model: str = typer.Option("qwen2.5:7b", "--model"),
+    n: int = typer.Option(100, "--n"),
+    seed: int = typer.Option(0, "--seed"),
+    prompt_version: int = typer.Option(2, "--prompt-version", help="Question prompt: 1 or 2 (see evals/synth.py)"),
+    work_dir: Path = typer.Option(Path.home() / ".mcp-kb" / "bench", "--work-dir"),
+    results_dir: Path = typer.Option(Path("results"), "--results-dir"),
+):
+    """Check kb eval against human labels: do synthetic questions rank setups like BEIR's human ones?"""
+    import json
+
+    from mcp_kb.evals import llm
+    from mcp_kb.evals.validate import validate
+
+    try:
+        generate = llm.ollama(model=model, seed=seed)
+    except llm.LLMUnavailable as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    r = validate(dataset, work_dir, results_dir, generate, model, n=n, seed=seed,
+                 log=lambda m: typer.echo(m, err=True), prompt_version=prompt_version)
+    out = results_dir / dataset / f"kb-eval-validation-{model.replace(':', '-')}-prompt{prompt_version}.json"
+    out.write_text(json.dumps(r, indent=1))
+    typer.echo(f"{dataset} / {model}: {r['n_answerable']} answerable kept, Spearman vs human ranking {r['spearman']}")
+    for s, h in r["human_ndcg@10"].items():
+        typer.echo(f"  {s:<17} human nDCG@10 {h:.3f}   synthetic MRR@5 {r['synthetic_mrr@5'][s]:.3f}")
+    typer.echo(f"Saved {out}")
 
 
 if __name__ == "__main__":

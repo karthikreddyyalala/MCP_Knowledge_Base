@@ -29,3 +29,12 @@ def test_cutoff_and_zero_grades_are_ignored():
 
 def test_recall_partial():
     assert recall_at_k(["a", "x"], {"a": 1, "b": 1}, 10) == 0.5
+
+
+def test_spearman():
+    from mcp_kb.evals.validate import spearman
+
+    assert abs(spearman([1, 2, 3, 4], [10, 20, 30, 40]) - 1.0) < 1e-9
+    assert abs(spearman([1, 2, 3, 4], [4, 3, 2, 1]) + 1.0) < 1e-9
+    # human order dense<bm25<hybrid<rerank vs synthetic bm25 first: rho = 1 - 6*6/(4*15) = 0.4
+    assert abs(spearman([0.659, 0.685, 0.711, 0.720], [0.579, 0.869, 0.741, 0.804]) - 0.4) < 1e-9
