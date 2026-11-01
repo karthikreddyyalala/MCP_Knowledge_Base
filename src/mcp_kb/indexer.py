@@ -1,7 +1,7 @@
 from pathlib import Path
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-from src.config import Settings
+from mcp_kb.config import Settings
 
 
 def chunk_markdown(text: str, chunk_size: int = 400, chunk_overlap: int = 50) -> list[dict]:

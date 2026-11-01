@@ -6,9 +6,9 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp import types
 
-from src.config import Settings
-from src.searcher import search, list_sources
-from src.tracing import setup_tracing
+from mcp_kb.config import Settings
+from mcp_kb.searcher import search, list_sources
+from mcp_kb.tracing import setup_tracing
 
 DOCS_PATH = Path(os.environ.get("KB_DOCS_PATH", "./docs"))
 DB_PATH = Path(os.environ.get("KB_DB_PATH", str(Path.home() / ".mcp-kb" / "chroma")))

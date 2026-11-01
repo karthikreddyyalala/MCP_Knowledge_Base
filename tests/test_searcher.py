@@ -1,9 +1,9 @@
 import re
 import pytest
 from pathlib import Path
-from src.config import Settings
-from src.indexer import build_index
-from src.searcher import search, list_sources
+from mcp_kb.config import Settings
+from mcp_kb.indexer import build_index
+from mcp_kb.searcher import search, list_sources
 
 
 @pytest.fixture

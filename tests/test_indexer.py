@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
-from src.config import Settings
-from src.indexer import build_index, chunk_markdown
+from mcp_kb.config import Settings
+from mcp_kb.indexer import build_index, chunk_markdown
 
 
 def test_chunk_markdown_splits_on_size():

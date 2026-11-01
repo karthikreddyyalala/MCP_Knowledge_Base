@@ -1,7 +1,7 @@
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-from src.config import Settings
-from src.tracing import search_span
+from mcp_kb.config import Settings
+from mcp_kb.tracing import search_span
 
 
 def _get_collection(settings: Settings):
