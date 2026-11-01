@@ -55,3 +55,15 @@ def test_build_index_stores_source_metadata(tmp_path):
     results = col.get(include=["metadatas"])
     sources = {m["source"] for m in results["metadatas"]}
     assert "runbook.md" in sources
+
+
+def test_sources_use_relative_paths(tmp_path):
+    from mcp_kb.searcher import list_sources
+    docs = tmp_path / "docs"
+    (docs / "a").mkdir(parents=True)
+    (docs / "b").mkdir()
+    (docs / "a" / "README.md").write_text("# A\n\nalpha service runbook\n")
+    (docs / "b" / "README.md").write_text("# B\n\nbeta service runbook\n")
+    settings = Settings(docs_path=docs, db_path=tmp_path / "chroma")
+    build_index(settings)
+    assert list_sources(settings) == ["a/README.md", "b/README.md"]

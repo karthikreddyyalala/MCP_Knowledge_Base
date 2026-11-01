@@ -73,9 +73,11 @@ def build_index(settings: Settings) -> int:
 
     for md_file in sorted(settings.docs_path.glob("**/*.md")):
         text = md_file.read_text(encoding="utf-8")
+        # Relative path, not just the filename: a/README.md and b/README.md must not collide.
+        source = md_file.relative_to(settings.docs_path).as_posix()
         for chunk in chunk_markdown(text, settings.chunk_size, settings.chunk_overlap):
             docs.append(chunk["text"])
-            metas.append({"source": md_file.name, "start_line": chunk["start_line"], "end_line": chunk["end_line"]})
+            metas.append({"source": source, "start_line": chunk["start_line"], "end_line": chunk["end_line"]})
             ids.append(f"chunk_{chunk_id}")
             chunk_id += 1
 
