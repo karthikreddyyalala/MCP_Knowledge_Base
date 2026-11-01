@@ -109,7 +109,6 @@ On SciFact the three are a statistical tie (all pairwise p > 0.5). On NFCorpus, 
 - **Synthetic questions still favour keyword search a little**: an LLM writing a question from a passage reuses its words. A word-overlap filter and the v2 prompt reduce it; it isn't gone.
 - **Relevance scores don't transfer across domains.** A threshold calibrated on BEIR (97% of answerable questions above it) flagged correct answers on short runbook text, such as "undo a bad deployment" (score −8.3 vs −6.57). So the default *warns* below the threshold instead of hiding results; `kb eval --save-threshold` calibrates a hard "not found" on your own docs if you want one.
 - **Near-misses are hard.** On-topic questions your docs don't answer often score like answerable ones; the score catches off-topic questions far better.
-- Scores move by up to ±0.005 between index rebuilds (approximate vector index).
 
 All numbers, with Recall@10, MRR@10, latency and p-values: [results/summary.md](results/summary.md). How each was produced and what went wrong along the way: [docs/BUILD_LOG.md](docs/BUILD_LOG.md).
 

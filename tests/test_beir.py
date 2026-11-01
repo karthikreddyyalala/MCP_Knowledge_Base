@@ -78,3 +78,17 @@ def test_summary_ignores_non_benchmark_json(tmp_path):
     (tmp_path / "results" / "fake" / "kb-eval-validation-x.json").write_text(json.dumps({"spearman": 1.0}))
     write_summary(tmp_path / "results")
     assert "| fake | dense |" in (tmp_path / "results" / "summary.md").read_text()
+
+
+def test_benchmark_never_refuses_even_with_a_strict_default(tmp_path, monkeypatch):
+    import mcp_kb.evals.beir as beir_mod
+    from mcp_kb.config import Settings
+
+    class Strict(Settings):  # a product default that would refuse everything
+        def __init__(self, **kw):
+            super().__init__(**{"min_score": 1e9, **kw})
+
+    monkeypatch.setattr(beir_mod, "Settings", Strict)
+    corpus, queries, qrels = load(_fake_dataset(tmp_path))
+    result = run("fake", corpus, queries, qrels, tmp_path / "work", setup="hybrid-rerank20")
+    assert all(result["run"][q] for q in queries)

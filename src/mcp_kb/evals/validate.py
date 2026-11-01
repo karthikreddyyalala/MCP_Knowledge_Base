@@ -11,7 +11,7 @@ from pathlib import Path
 
 from mcp_kb.evals import own
 from mcp_kb.evals.beir import _ensure_index, download, load
-from mcp_kb.evals.llm import Generate
+from mcp_kb.llm import Generate
 from mcp_kb.evals.synth import PROMPT_VERSION, generate_gold, overlap
 
 

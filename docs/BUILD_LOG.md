@@ -153,7 +153,7 @@ Against the original dense search, the default is +0.061 (SciFact), +0.044 (NFCo
 
 **Verified by hand:** index twice (second run: 3 unchanged, no work), edit one file and delete another (1 changed, 1 removed, 9 -> 7 chunks), the new "Database rollback" section is found at its exact line, off-topic question says "No relevant results in your docs."
 
-**Checked that the rewrite didn't change quality:** rebuilt the SciFact index with the new code: 0.715 vs 0.720 committed. Two rebuilds differ on 1 of 300 queries, committed vs new on 3 of 300 (p = 0.25): approximate vector index noise, not a regression. README now states the noise as up to ±0.005.
+**Checked that the rewrite didn't change quality:** rebuilt the SciFact index with the new code: 0.715 vs 0.720 committed. ~~I explained this as approximate vector index noise ("up to ±0.005 between rebuilds").~~ **That was wrong**, found in phase 9: at the time the "not found" threshold was a product default and the benchmark inherited it, so 3 SciFact questions returned nothing. With refusal off, the new code scores exactly 0.720 and two runs give identical rankings. Benchmarks now force refusal off (with a test). Committed results were not affected: they were produced before that default existed or by code paths that turn refusal off.
 
 **Small fix found while testing:** `kb search` said "Did you run kb index?" for off-topic questions even when an index existed; it now prints the same "not found" message as the server.
 

@@ -99,7 +99,9 @@ def doc_ids_from_chunks(results: list[dict]) -> list[str]:
 
 def _ensure_index(corpus: dict, work: Path, overrides: dict) -> Settings:
     """Build one index per dataset and chunking config; setups that share a config share the index."""
-    base = Settings(**overrides)
+    # Benchmarks measure ranking: never refuse, whatever the product defaults are. (A phase 4
+    # default threshold once leaked in here and silently emptied 3 SciFact results.)
+    base = Settings(**{"min_score": None, **overrides})
     config = {f: getattr(base, f) for f in INDEX_FIELDS} | {"n_docs": len(corpus)}
     key = hashlib.sha1(json.dumps(config, sort_keys=True).encode()).hexdigest()[:10]
     settings = dataclasses.replace(base, docs_path=work / "docs", db_path=work / f"chroma-{key}",

@@ -25,6 +25,11 @@ class Settings:
     # Hard refusal ("not found") below this score. Off by default; `kb eval --save-threshold`
     # sets it from your own docs (see config.with_calibration).
     min_score: float | None = None
+    # Optional LLM query expansion through Ollama (see expand.py). Off by default: it adds an LLM
+    # call to every search.
+    expand_queries: bool = False
+    expand_model: str = "llama3.2:3b"
+    expand_cache: bool = True  # remember expansions next to the index
 
 
 CALIBRATION_FILE = "calibration.json"

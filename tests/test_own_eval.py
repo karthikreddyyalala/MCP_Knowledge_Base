@@ -5,7 +5,7 @@ import re
 import pytest
 
 from mcp_kb.config import Settings, save_calibration, with_calibration
-from mcp_kb.evals import llm
+from mcp_kb import llm
 from mcp_kb.evals.own import evaluate
 from mcp_kb.evals.synth import generate_gold, load_gold, overlap, save_gold
 from mcp_kb.indexer import sync

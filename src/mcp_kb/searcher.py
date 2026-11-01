@@ -3,6 +3,7 @@ from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunct
 
 from mcp_kb import bm25
 from mcp_kb.config import Settings
+from mcp_kb.expand import expand
 from mcp_kb.fusion import rrf
 from mcp_kb.indexer import COLLECTION
 from mcp_kb.models import get_reranker
@@ -35,14 +36,25 @@ def _dense(col, query: str, n: int) -> list[dict]:
 
 
 def _retrieve(col, query: str, settings: Settings, n: int) -> list[dict]:
-    if settings.search_mode == "dense":
-        return _dense(col, query, n)
-    if settings.search_mode == "bm25":
-        return bm25.query(settings.db_path, query, n)
-    dense_hits = _dense(col, query, max(n, settings.candidates))
-    keyword_hits = bm25.query(settings.db_path, query, max(n, settings.candidates))
-    by_id = {h["id"]: h for h in keyword_hits + dense_hits}
-    return [by_id[i] for i in rrf([[h["id"] for h in dense_hits], [h["id"] for h in keyword_hits]])[:n]]
+    """Ranked candidates. One list per retriever and query variant, fused with RRF when there are several."""
+    extra = expand(query, settings) if settings.expand_queries else {}
+    dense_queries = [query] + ([extra["hypothetical"]] if "hypothetical" in extra else [])
+    keyword_queries = [query] + ([extra["keywords"]] if "keywords" in extra else [])
+
+    lists = []
+    single = settings.search_mode != "hybrid" and not extra
+    m = n if single else max(n, settings.candidates)
+    if settings.search_mode in ("dense", "hybrid"):
+        lists += [_dense(col, q, m) for q in dense_queries]
+    if settings.search_mode in ("bm25", "hybrid"):
+        lists += [bm25.query(settings.db_path, q, m) for q in keyword_queries]
+    if len(lists) == 1:
+        return lists[0][:n]
+    by_id = {}
+    for hits in lists:
+        for h in hits:
+            by_id.setdefault(h["id"], h)
+    return [by_id[i] for i in rrf([[h["id"] for h in hits] for hits in lists])[:n]]
 
 
 def _rerank(query: str, hits: list[dict], settings: Settings) -> list[dict]:

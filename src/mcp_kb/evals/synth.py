@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 from mcp_kb.config import Settings
-from mcp_kb.evals.llm import Generate
+from mcp_kb.llm import Generate
 from mcp_kb.searcher import _get_collection, search
 
 PROMPT_VERSION = 2  # 1: "use your own words"; 2: "phrase it like someone who has not read it"

@@ -115,7 +115,8 @@ def eval_(
     import json
     import random
 
-    from mcp_kb.evals import llm, own, synth
+    from mcp_kb import llm
+    from mcp_kb.evals import own, synth
 
     settings = Settings(docs_path=docs, db_path=db)
     typer.echo("Syncing index: " + sync(settings).summary())
@@ -168,7 +169,7 @@ def validate_eval(
     """Check kb eval against human labels: do synthetic questions rank setups like BEIR's human ones?"""
     import json
 
-    from mcp_kb.evals import llm
+    from mcp_kb import llm
     from mcp_kb.evals.validate import validate
 
     try:
