@@ -1,0 +1,82 @@
+{
+ "dataset": "scifact",
+ "model": "qwen2.5:7b",
+ "prompt_version": 1,
+ "n_chunks": 100,
+ "seed": 0,
+ "date": "2026-11-01",
+ "n_answerable": 44,
+ "n_unanswerable": 66,
+ "generation": {
+  "chunks": 100,
+  "answerable_written": 100,
+  "dropped_overlap": 52,
+  "dropped_not_answered": 4,
+  "unanswerable_written": 100,
+  "dropped_answered_elsewhere": 34,
+  "dropped_duplicate": 0
+ },
+ "mean_overlap_kept": 0.669,
+ "human_ndcg@10": {
+  "dense": 0.6595,
+  "bm25": 0.6846,
+  "hybrid": 0.7107,
+  "hybrid-rerank20": 0.7204
+ },
+ "synthetic_mrr@5": {
+  "dense": 0.732,
+  "bm25": 0.915,
+  "hybrid": 0.854,
+  "hybrid-rerank20": 0.943
+ },
+ "spearman": 0.8,
+ "best_human": "hybrid-rerank20",
+ "best_synthetic": "hybrid-rerank20",
+ "abstention": {
+  "n_answerable": 44,
+  "n_unanswerable": 66,
+  "shipped_threshold": {
+   "threshold": -6.57,
+   "answered_rate": 1.0,
+   "abstained_rate": 0.0
+  },
+  "balanced": {
+   "threshold": 5.14,
+   "balanced_accuracy": 0.659,
+   "answered_rate": 0.636,
+   "abstained_rate": 0.682
+  },
+  "min_answered_0.97": {
+   "threshold": -0.324,
+   "balanced_accuracy": 0.519,
+   "answered_rate": 0.977,
+   "abstained_rate": 0.061
+  }
+ },
+ "setups": {
+  "dense": {
+   "hit@5": 0.795,
+   "mrr@5": 0.732,
+   "p50_ms": 6.9,
+   "p_vs_default": 0.001
+  },
+  "bm25": {
+   "hit@5": 0.955,
+   "mrr@5": 0.915,
+   "p50_ms": 14.6,
+   "p_vs_default": 0.5
+  },
+  "hybrid": {
+   "hit@5": 0.955,
+   "mrr@5": 0.854,
+   "p50_ms": 21.1,
+   "p_vs_default": 0.016
+  },
+  "hybrid-rerank20": {
+   "hit@5": 0.955,
+   "mrr@5": 0.943,
+   "p50_ms": 64.4,
+   "p_vs_default": null
+  }
+ }
+}

@@ -1,0 +1,82 @@
+{
+ "dataset": "nfcorpus",
+ "model": "qwen2.5:7b",
+ "prompt_version": 2,
+ "n_chunks": 100,
+ "seed": 0,
+ "date": "2026-11-01",
+ "n_answerable": 58,
+ "n_unanswerable": 74,
+ "generation": {
+  "chunks": 100,
+  "answerable_written": 100,
+  "dropped_overlap": 23,
+  "dropped_not_answered": 19,
+  "unanswerable_written": 100,
+  "dropped_answered_elsewhere": 26,
+  "dropped_duplicate": 0
+ },
+ "mean_overlap_kept": 0.613,
+ "human_ndcg@10": {
+  "dense": 0.3208,
+  "bm25": 0.3229,
+  "hybrid": 0.3489,
+  "hybrid-rerank20": 0.3645
+ },
+ "synthetic_mrr@5": {
+  "dense": 0.583,
+  "bm25": 0.693,
+  "hybrid": 0.698,
+  "hybrid-rerank20": 0.784
+ },
+ "spearman": 1.0,
+ "best_human": "hybrid-rerank20",
+ "best_synthetic": "hybrid-rerank20",
+ "abstention": {
+  "n_answerable": 58,
+  "n_unanswerable": 74,
+  "shipped_threshold": {
+   "threshold": -6.57,
+   "answered_rate": 1.0,
+   "abstained_rate": 0.0
+  },
+  "balanced": {
+   "threshold": 4.02,
+   "balanced_accuracy": 0.63,
+   "answered_rate": 0.638,
+   "abstained_rate": 0.622
+  },
+  "min_answered_0.97": {
+   "threshold": -4.626,
+   "balanced_accuracy": 0.5,
+   "answered_rate": 1.0,
+   "abstained_rate": 0.0
+  }
+ },
+ "setups": {
+  "dense": {
+   "hit@5": 0.741,
+   "mrr@5": 0.583,
+   "p50_ms": 6.5,
+   "p_vs_default": 0.0
+  },
+  "bm25": {
+   "hit@5": 0.845,
+   "mrr@5": 0.693,
+   "p50_ms": 10.3,
+   "p_vs_default": 0.036
+  },
+  "hybrid": {
+   "hit@5": 0.793,
+   "mrr@5": 0.698,
+   "p50_ms": 16.5,
+   "p_vs_default": 0.032
+  },
+  "hybrid-rerank20": {
+   "hit@5": 0.897,
+   "mrr@5": 0.784,
+   "p50_ms": 58.9,
+   "p_vs_default": null
+  }
+ }
+}

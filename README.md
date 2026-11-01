@@ -4,6 +4,8 @@
 
 **[mcp-kb-site.vercel.app](https://mcp-kb-site.vercel.app)**
 
+> New here? Read [docs/START_HERE.md](docs/START_HERE.md): the whole project on one page.
+
 Give Claude Desktop semantic search over your private markdown docs. Ask a question, get a cited answer from your actual files - nothing uploaded anywhere.
 
 ---

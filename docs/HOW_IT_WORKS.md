@@ -37,6 +37,11 @@ You point `kb index` at a folder of markdown files. It cuts each file into small
 | **Ablation** | Turn one piece on or off and measure the change, so each piece's value is known. | `SETUPS` in `beir.py` |
 | **Paired randomization test** | Is a score difference real or luck? Randomly flip the sign of each query's difference 10,000 times; if a gap as big as ours shows up often, it's noise. p < 0.05 = probably real. | [stats.py](../src/mcp_kb/evals/stats.py) |
 | **Incremental sync / manifest** | Remember each file's content hash and chunk ids, so re-indexing only touches files that changed. | [indexer.py](../src/mcp_kb/indexer.py) |
+| **Synthetic test set (gold set)** | Test questions written by a local LLM from your own chunks, each labelled with the chunk that answers it, plus on-topic questions your docs can't answer. | [synth.py](../src/mcp_kb/evals/synth.py) |
+| **Lexical leakage** | An LLM writing a question from a passage tends to reuse its words, which makes keyword search look better than it is. Countered by the overlap filter (drop > 75% shared words) and prompt v2. | `overlap`, `ANSWERABLE_V2` |
+| **LLM as judge** | The same local model checks that a question really is answered by its chunk, and that an "unanswerable" one isn't answered by the top 3 results. | `answers` in synth.py |
+| **Spearman correlation** | Do two rankings agree? 1.0 = same order. Used to check `kb eval`'s ranking of setups against human-labelled BEIR. | [validate.py](../src/mcp_kb/evals/validate.py) |
+| **Ollama** | Runs open LLMs locally behind an HTTP API on `localhost:11434`. Only `kb eval` uses it. | [llm.py](../src/mcp_kb/evals/llm.py) |
 | **Regression gate** | A test that fails if search quality on the example docs drops. | [test_retrieval_quality.py](../tests/test_retrieval_quality.py) |
 
 ---
@@ -99,6 +104,27 @@ compute nDCG@10, Recall@10, MRR@10, p50/p95 latency, per-query nDCG
 save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs dense
 ```
 
+### Measuring on your own docs: `kb eval ./docs`
+
+```
+sync the index
+sample N chunks (seeded)
+for each chunk, local LLM (qwen2.5:7b via Ollama) writes:
+   answerable question     -> drop if it copies the chunk's words (overlap > 0.75)
+                           -> drop unless the LLM confirms the chunk answers it
+   unanswerable question   -> drop if any of the top 3 search results answers it
+save gold.jsonl (reuse later with --gold, no LLM needed)
+score dense / bm25 / hybrid / hybrid-rerank20: hit@5, MRR@5, p-value vs the default
+calibrate "not found" on answerable vs unanswerable top scores (--save-threshold to keep it)
+recommend: keep the default unless another setup is better with p < 0.05
+```
+
+`kb validate-eval --dataset nfcorpus` runs the same generation on a BEIR corpus and checks the setup ranking against human labels.
+
+### Comparing with other tools: `kb bench --setup qmd --tool-bin <path>`
+
+Each tool indexes the same `<doc_id>.md` files and is queried **through its own MCP server** (models load once, like real use), then scored by the same metrics code. See [adapters.py](../src/mcp_kb/evals/adapters.py).
+
 ---
 
 ## 4. File tour
@@ -125,7 +151,12 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 | [metrics.py](../src/mcp_kb/evals/metrics.py) | nDCG@k, Recall@k, MRR@k, matching BEIR/pytrec_eval definitions. |
 | [stats.py](../src/mcp_kb/evals/stats.py) | Paired randomization test for "is this difference real?". |
 | [beir.py](../src/mcp_kb/evals/beir.py) | Download, load, index, run, save, summarize; `SETUPS` defines every ablation row; `calibrate_abstention`. |
-| [abstain.py](../src/mcp_kb/evals/abstain.py) | Chooses the "not found" threshold by balanced accuracy. |
+| [abstain.py](../src/mcp_kb/evals/abstain.py) | Chooses the "not found" threshold (balanced accuracy, or "answer at least 97%"). |
+| [llm.py](../src/mcp_kb/evals/llm.py) | Ollama client (stdlib HTTP, JSON mode) with a clear install message if it isn't running. |
+| [synth.py](../src/mcp_kb/evals/synth.py) | Writes the gold set from your chunks: prompts, overlap filter, LLM judge, save/load. |
+| [own.py](../src/mcp_kb/evals/own.py) | Scores setups on the gold set, calibrates the threshold, recommends, formats the report. |
+| [validate.py](../src/mcp_kb/evals/validate.py) | Checks `kb eval` against human-labelled BEIR (Spearman). |
+| [adapters.py](../src/mcp_kb/evals/adapters.py) | Runs qmd and knowledge-rag through their MCP servers for the head-to-head. |
 
 ### Tests: `tests/`
 
@@ -139,7 +170,8 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 | `test_stats.py` | Significance test and RRF math. |
 | `test_metrics.py` | Metric values computed by hand. |
 | `test_abstain.py` | Threshold selection. |
-| `test_beir.py` | The benchmark runner on a tiny fake dataset (no network). |
+| `test_beir.py` | The benchmark runner on a tiny fake dataset (no network); external-tool path mapping. |
+| `test_own_eval.py` | `kb eval` with a fake LLM: every filter, de-duplication, evaluation, saved threshold, the CLI with `--gold`, and the missing-Ollama message. |
 | `test_retrieval_quality.py` | Regression gate on `example-docs`: 17 answerable questions per search mode, and with shipped defaults every answerable question is answered and 5 unanswerable ones are refused. |
 | `test_server.py` | Starts `kb serve` and talks real MCP to it, like Claude does; includes an edit made after indexing being picked up at startup, and an off-topic question getting "not found". |
 
@@ -175,6 +207,11 @@ claude mcp add kb -- $PWD/.venv/bin/kb serve --docs $PWD/example-docs   # connec
 # measure
 .venv/bin/kb bench --dataset scifact --setup hybrid    # setups: see SETUPS in evals/beir.py
 .venv/bin/kb calibrate                                 # "not found" threshold -> results/abstention.json
+ollama serve &                                         # local LLM, only for kb eval
+.venv/bin/kb eval ./example-docs                       # measure search on your own docs
+.venv/bin/kb eval ./docs --gold <db>/eval/gold.jsonl   # re-score a saved test set, no LLM
+.venv/bin/kb eval ./docs --save-threshold              # keep the calibrated "not found" threshold
+.venv/bin/kb validate-eval --dataset nfcorpus          # check kb eval against human labels
 cat results/summary.md
 ```
 

@@ -165,14 +165,45 @@ Against the original dense search, the default is +0.061 (SciFact), +0.044 (NFCo
 
 ---
 
+## Phase 6: `kb eval`, measuring search on your own docs
+
+**Built:** `evals/llm.py` (Ollama over stdlib HTTP, JSON mode, clear install message), `evals/synth.py` (per chunk: one answerable and one on-topic unanswerable question; filters for copied wording, unsupported answers, duplicates, and "unanswerable" questions the docs answer elsewhere), `evals/own.py` (hit@5, MRR@5, p-values vs the default, threshold calibration, recommendation), `kb eval` (`--gold` reuse without an LLM, `--review` human spot-check, `--save-threshold` stored next to the index and used by `kb search`/`kb serve`), `kb validate-eval` (checks the whole thing against human-labelled BEIR). Installed Ollama with Homebrew and pulled `llama3.2:3b` and `qwen2.5:7b`.
+
+**First real run** on example-docs worked end to end in 11 s, but showed two problems: the 25-word minimum skipped most short sections (lowered to 12), and the 3B judge accepted a question the chunk didn't really answer.
+
+**Validation against human labels** (Spearman of the four setups' ranking; 100 chunks each):
+
+| Model, prompt | SciFact (tuning) | NFCorpus (held out) | Answerable kept (SciFact / NFCorpus) |
+|---|---|---|---|
+| llama3.2:3b, v1 | 0.4 (picked bm25 as best: wrong) | not run | 28 / - |
+| qwen2.5:7b, v1 | 0.8 | 0.8 | 44 / 44 |
+| **qwen2.5:7b, v2 (default)** | **0.8** | **1.0** | **55 / 58** |
+
+Prompt v2 asks for the question "the way a colleague who has NOT read it would ask", in everyday words. It was tuned on SciFact and then checked on NFCorpus, which it was never tuned on; it matched the human ranking exactly there and reduced keyword over-reward (BM25's synthetic score 0.786 -> 0.693 on NFCorpus).
+
+**Honest limits found:**
+- Synthetic questions still favour BM25 somewhat (on SciFact, BM25 ranks second on synthetic questions but third on human ones).
+- "Not found" can't separate near-miss questions: on SciFact with the 7B model, keeping 98% of answerable questions refuses only 6% of on-topic unanswerable ones. The shipped threshold catches off-topic questions, not near-misses.
+- Small gold sets (~50 questions) give wide error bars; the report says so and suggests `--n 100+`.
+
+**Mistakes and fixes:** `--gold` crashed when saving the report because the `eval/` folder didn't exist yet (tests hadn't covered the CLI path; a CLI test now does). Running `knowledge-rag --help` started its server and created `documents/` and `data/` folders in the repo; they were deleted immediately.
+
+**Interview answers**
+1. *Why generate questions per chunk, and what bias does that create?* It gives every question a known answer location. The bias is lexical leakage: the model reuses the chunk's words, which flatters keyword search.
+2. *Why filter word overlap at 0.75?* Questions that mostly copy the chunk test string matching, not search. 0.75 is a fixed cut-off, marked in code as one to tune if reviews show good questions being dropped.
+3. *Risks of an LLM judging its own questions?* It can be lenient (the 3B model was). Mitigations: a stronger model, judging against retrieved text rather than memory, a human `--review`, and validating the whole pipeline against human labels.
+4. *How far can you trust a recommendation from ~50 questions?* Only for large differences; that's why the recommendation requires p < 0.05 and otherwise keeps the default.
+
+---
+
 ## Remaining phases (from the spec)
 
 | # | Phase | Status |
 |---|---|---|
 | 4 | Rerank + not found | done |
 | 5 | Incremental sync (re-index only changed files) and sync at server start | done |
-| 6 | `kb eval`: generate test questions from your own docs with a local LLM (Ollama), including unanswerable ones; recommend a setup and threshold | not started (needs Ollama installed) |
-| 7 | `kb bench` adapters for qmd and knowledge-rag; comparison table with wins and losses | not started |
+| 6 | `kb eval`: generate test questions from your own docs with a local LLM (Ollama), including unanswerable ones; recommend a setup and threshold | done |
+| 7 | `kb bench` adapters for qmd and knowledge-rag; comparison table with wins and losses | in progress (adapters done; runs going) |
 | 8 | PyPI + `uvx`, MCP registry, README rewrite, demo GIF, blog post, portfolio update | not started |
 
 ## How to resume
