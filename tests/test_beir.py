@@ -66,3 +66,15 @@ def test_external_doc_ids_map_paths_case_insensitively():
     known = {"med-10": "MED-10", "d2": "d2"}
     paths = ["beir/med-10.md", "/abs/documents/MED-10.md", "beir/d2.md", "beir/unknown.md"]
     assert doc_ids(paths, known) == ["MED-10", "d2"]
+
+
+def test_summary_ignores_non_benchmark_json(tmp_path):
+    from mcp_kb.evals.beir import write_summary
+
+    corpus, queries, qrels = load(_fake_dataset(tmp_path))
+    result = run("fake", corpus, queries, qrels, tmp_path / "work", setup="dense")
+    (tmp_path / "results" / "fake").mkdir(parents=True)
+    (tmp_path / "results" / "fake" / "dense.json").write_text(json.dumps(result))
+    (tmp_path / "results" / "fake" / "kb-eval-validation-x.json").write_text(json.dumps({"spearman": 1.0}))
+    write_summary(tmp_path / "results")
+    assert "| fake | dense |" in (tmp_path / "results" / "summary.md").read_text()

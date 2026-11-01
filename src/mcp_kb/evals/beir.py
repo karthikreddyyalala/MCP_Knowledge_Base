@@ -205,7 +205,8 @@ def write_summary(results_dir: Path) -> None:
     rows = ["| Dataset | Setup | nDCG@10 | Δ vs dense | p | Recall@10 | MRR@10 | p50 ms | p95 ms | Queries |",
             "|---|---|---|---|---|---|---|---|---|---|"]
     for ds_dir in sorted(p for p in results_dir.iterdir() if p.is_dir()):
-        results = {f.stem: json.loads(f.read_text()) for f in sorted(ds_dir.glob("*.json"))}
+        loaded = {f.stem: json.loads(f.read_text()) for f in sorted(ds_dir.glob("*.json"))}
+        results = {k: v for k, v in loaded.items() if "metrics" in v}  # skip kb-eval validation files
         base = results.get(BASELINE_SETUP)
         for setup, r in results.items():
             m = r["metrics"]

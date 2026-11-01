@@ -81,7 +81,7 @@ class KnowledgeRag(Adapter):
     def version(self) -> str:
         site = next(self.binary.resolve().parent.parent.glob("lib/python*/site-packages"), None)
         dist = next(site.glob("knowledge_rag-*.dist-info"), None) if site else None
-        return dist.name.split("-")[1] if dist else "unknown"
+        return dist.name.removesuffix(".dist-info").split("-")[1] if dist else "unknown"
 
     def prepare(self, docs: Path, work: Path) -> None:
         work.mkdir(parents=True, exist_ok=True)
