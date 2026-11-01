@@ -10,10 +10,7 @@ def setup_tracing() -> bool:
     if not os.environ.get("PHOENIX_ENABLED"):
         return False
     try:
-        import phoenix as px
         from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from phoenix.otel import register
 
         register(project_name="mcp-knowledge-base", auto_instrument=False)
