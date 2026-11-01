@@ -3,15 +3,31 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-knowledge-base"
-version = "0.1.0"
+name = "mcp-knowledge-base"  # taken on PyPI: rename before publishing (see docs/START_HERE.md)
+version = "0.2.0"
+description = "Local MCP search over your markdown docs for Claude: hybrid retrieval, reranking, cited answers, and an evaluator for your own docs."
+readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Karthik Reddy" }]
+keywords = ["mcp", "claude", "rag", "retrieval", "bm25", "hybrid-search", "reranking", "beir", "evaluation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "mcp>=2.3,<3",
     "chromadb>=0.5.0",
     "sentence-transformers>=3.0.0",
     "typer>=0.12.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base"
+Documentation = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base/blob/main/docs/START_HERE.md"
+Results = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base/blob/main/results/summary.md"
 
 [project.scripts]
 kb = "mcp_kb.cli:app"
