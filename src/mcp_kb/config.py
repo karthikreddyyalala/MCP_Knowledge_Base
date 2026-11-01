@@ -4,7 +4,7 @@ from pathlib import Path
 
 @dataclass
 class Settings:
-    docs_path: Path
+    docs_path: Path | None = None  # only needed for indexing
     db_path: Path = field(default_factory=lambda: Path.home() / ".mcp-kb" / "chroma")
     top_k: int = 5
     model_name: str = "all-MiniLM-L6-v2"

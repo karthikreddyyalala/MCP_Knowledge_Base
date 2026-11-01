@@ -45,3 +45,9 @@ def test_list_sources_returns_filenames(indexed_settings):
     sources = list_sources(indexed_settings)
     assert "deploy.md" in sources
     assert "onboarding.md" in sources
+
+
+def test_empty_index_returns_nothing(tmp_path):
+    settings = Settings(db_path=tmp_path / "empty")
+    assert search("anything", settings) == []
+    assert list_sources(settings) == []
