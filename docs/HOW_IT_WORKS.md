@@ -8,7 +8,7 @@ For *why* each decision was made and what it measured, see [BUILD_LOG.md](BUILD_
 
 ## 1. The one-paragraph version
 
-You point `kb index` at a folder of markdown files. It cuts each file into small pieces (chunks), and stores every chunk twice: once as an **embedding** (a list of 384 numbers that captures meaning) in ChromaDB, and once as **words** in a BM25 keyword index (SQLite). When Claude asks a question through MCP, `kb serve` finds the best chunks with both methods, merges the two lists (**RRF**), optionally re-scores the top 20 with a slower, more accurate model (**reranker**), and returns them with exact `file:line` citations. If even the best chunk is a poor match, it says "No relevant results in your docs." instead of guessing. Everything runs on your machine; only the returned chunks enter the conversation.
+You point `kb index` at a folder of markdown files. It cuts each file into small pieces (chunks), and stores every chunk twice: once as an **embedding** (a list of 384 numbers that captures meaning) in ChromaDB, and once as **words** in a BM25 keyword index (SQLite). When Claude asks a question through MCP, `kb serve` finds the best chunks with both methods, merges the two lists (**RRF**), optionally re-scores the top 20 with a slower, more accurate model (**reranker**), and returns them with exact `file:line` citations. If even the best chunk is a poor match, it adds a "Low confidence" note so Claude doesn't present weak matches as answers (a hard "No relevant results" is available if you calibrate it on your own docs with `kb eval --save-threshold`). Everything runs on your machine; only the returned chunks enter the conversation.
 
 ---
 
@@ -28,7 +28,7 @@ You point `kb index` at a folder of markdown files. It cuts each file into small
 | **Hybrid search** | Run dense and BM25, then merge. Each catches what the other misses. | `_retrieve` |
 | **RRF** (Reciprocal Rank Fusion) | Merge ranked lists by position: each list gives an item `1 / (60 + rank)`. Uses ranks because cosine and BM25 scores are on unrelated scales. | [fusion.py](../src/mcp_kb/fusion.py) |
 | **Cross-encoder / reranker** | Reads query and chunk *together* and scores the match. Much more accurate than a bi-encoder, but too slow to run on everything, so it only rescores the top candidates. | `_rerank`, `get_reranker` |
-| **Abstention / "not found"** | If the reranker's best score is below a threshold, return nothing instead of irrelevant chunks. | `Settings.min_score`, [abstain.py](../src/mcp_kb/evals/abstain.py) |
+| **Low-confidence warning / abstention** | If the reranker's best score is below `warn_below` (-6.57, calibrated on BEIR), results get a warning. A hard "not found" (`min_score`) is off by default because thresholds don't transfer between kinds of text; `kb eval --save-threshold` sets it from your docs. | `Settings.warn_below`, `Settings.min_score`, [abstain.py](../src/mcp_kb/evals/abstain.py) |
 | **BEIR** | A standard public benchmark suite for retrieval. We use SciFact, NFCorpus and FiQA. | [beir.py](../src/mcp_kb/evals/beir.py) |
 | **qrels** | The answer key: for each query, which documents are relevant and how much (grade). | `beir.load` |
 | **nDCG@10** | Are the most relevant docs at the very top? 1.0 = ideal order. The main BEIR metric. | [metrics.py](../src/mcp_kb/evals/metrics.py) |
@@ -87,9 +87,10 @@ server.search_docs  ->  searcher.search(query, settings)          src/mcp_kb/sea
        hybrid (default): rrf([dense ids, bm25 ids])
   2. _rerank (default on)
        cross-encoder scores (query, chunk) for the top 20 (rerank_candidates); sort by score
-  3. abstain (default min_score -6.57, from results/abstention.json)
+  3. min_score (off by default; set by kb eval --save-threshold)
        best score < min_score  ->  []  ->  "No relevant results in your docs."
-  4. format top_k (5):  "[source: ops/runbook.md:L8-L14]\n<chunk text>"
+  4. server.format_results: best score < warn_below (-6.57)  ->  prepend "Low confidence: ..."
+  5. format top_k (5):  "[source: ops/runbook.md:L8-L14]\n<chunk text>"
 ```
 
 ### Measuring: `kb bench --dataset scifact --setup hybrid`
@@ -142,6 +143,7 @@ Each tool indexes the same `<doc_id>.md` files and is queried **through its own 
 | [searcher.py](../src/mcp_kb/searcher.py) | The search pipeline: retrieve, rerank, abstain, format. | `search` docstring, then `_retrieve`. |
 | [server.py](../src/mcp_kb/server.py) | MCP server (SDK v2 `MCPServer`) with `search_docs` and `list_docs`; syncs `--docs` and warms models at start. Logs go to stderr because stdout carries MCP. | `build_server`, `run`. |
 | [cli.py](../src/mcp_kb/cli.py) | The `kb` command: `index`, `search`, `serve`, `bench`, `calibrate`. | `--help` output. |
+| [\_\_init\_\_.py](../src/mcp_kb/__init__.py) | Runs first: switches Hugging Face to offline mode once models are cached, and quiets library logs. | `models_cached`. |
 | [tracing.py](../src/mcp_kb/tracing.py) | Optional Arize Phoenix spans for each search. Off unless `PHOENIX_ENABLED=1`. | Skip until needed. |
 
 ### Evaluation code: `src/mcp_kb/evals/`

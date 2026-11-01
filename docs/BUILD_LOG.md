@@ -196,6 +196,42 @@ Prompt v2 asks for the question "the way a colleague who has NOT read it would a
 
 ---
 
+## Phase 7: head-to-head with qmd and knowledge-rag
+
+**Built:** `evals/adapters.py`. Both tools index the same `<doc_id>.md` files and are queried **through their own MCP servers** (models load once, the way Claude uses them), then scored by the same metrics code: `kb bench --setup qmd|knowledge-rag --tool-bin <path>`. Both were installed in isolated folders (qmd's models and index kept out of `~/.cache`).
+
+**Measured (nDCG@10):**
+
+| | SciFact | NFCorpus | p50 latency (SciFact) |
+|---|---|---|---|
+| qmd 2.8.3 (LLM query expansion + LLM rerank) | 0.729 | **0.383** | 7.1 s |
+| **kb** | 0.720 | 0.364 | **67 ms** |
+| knowledge-rag 4.11.1 | 0.718 | 0.338 | 224 ms |
+
+SciFact pairwise: qmd vs kb +0.008 (p = 0.62), knowledge-rag vs kb -0.003 (p = 0.78): a statistical tie. On NFCorpus, qmd wins (+0.018 over kb, p = 0.02), most likely from rewriting each question with an LLM before searching, at about 85× the latency; kb beats knowledge-rag there (+0.027, p < 0.001). That loss points at a concrete next experiment: optional LLM query expansion, measured the same way. FiQA wasn't run for the other tools (qmd would need hours to embed 57k docs here).
+
+**Fairness notes:** qmd's Metal (GPU) shaders failed to compile on this macOS, so it likely ran on CPU and its latency isn't representative; quality is unaffected. Each tool used its documented defaults; nothing was tuned on the test set.
+
+**Mistakes and fixes:** `knowledge-rag --help` doesn't print help, it starts the server, which created `documents/` and `data/` in the repo (deleted at once). The summary generator crashed on the new validation JSON files in `results/` (fixed, with a test). My progress logging for qmd was filtered out of the log, so its first run looked stuck; checking CPU time showed it was progressing.
+
+---
+
+## Phase 8: ship it
+
+**Built:**
+- **Package metadata** and a **release workflow** (`.github/workflows/release.yml`): pushing a `v*` tag runs the tests, builds, and publishes to PyPI with trusted publishing (no stored token).
+- **Clean-install test:** built the wheel and installed it with `uvx` in an empty folder outside the repo: it indexed new notes, found a paraphrase, and handled an off-topic question.
+- **Offline fix (found by that test):** every run was contacting the Hugging Face Hub to check for model updates, contradicting the "nothing touches the network" promise. Once all models are cached, the package now switches the Hugging Face libraries to offline mode before they load; the first run still downloads. Also silenced torch/transformers log noise. Two tests cover it.
+- **Default changed from "refuse" to "warn" (found while recording the demo):** "undo a bad deployment" returned the right runbook section, but the BEIR-calibrated threshold (-6.57) refused it at score -8.3. Thresholds calibrated on one kind of text don't transfer to another. By default, results below the threshold now come with a "Low confidence" note and Claude judges; hard "not found" is opt-in through `kb eval --save-threshold` on your own docs. A test now requires three conversational paraphrases to never be hidden.
+- **Demo GIF** recorded from a script (`docs/demo.tape`, rendered with `vhs`). Reviewing frames caught zsh treating `#` narration as commands and the eval report still saying "not found" after the default changed; both fixed.
+- **README rewritten** for launch: demo, install, results with losses, comparison, evaluator validation, measured limits.
+- **Landing page** (`docs/index.html`, deployed by Vercel from `main`) still claimed "MRR 0.585 on MS MARCO, 3.5x BM25"; replaced with the BEIR results and comparison.
+- **Launch drafts:** `docs/launch/blog-post.md` and `docs/launch/posts.md` (Hacker News, LinkedIn, r/LocalLLaMA).
+
+**Needs you:** pick a PyPI name (`mcp-knowledge-base` and `kb-mcp` are taken), choose a license, set up the PyPI trusted publisher, review the site in a browser, merge to `main`, post the launch, update the portfolio card.
+
+---
+
 ## Remaining phases (from the spec)
 
 | # | Phase | Status |
@@ -203,8 +239,8 @@ Prompt v2 asks for the question "the way a colleague who has NOT read it would a
 | 4 | Rerank + not found | done |
 | 5 | Incremental sync (re-index only changed files) and sync at server start | done |
 | 6 | `kb eval`: generate test questions from your own docs with a local LLM (Ollama), including unanswerable ones; recommend a setup and threshold | done |
-| 7 | `kb bench` adapters for qmd and knowledge-rag; comparison table with wins and losses | in progress (adapters done; runs going) |
-| 8 | PyPI + `uvx`, MCP registry, README rewrite, demo GIF, blog post, portfolio update | not started |
+| 7 | `kb bench` adapters for qmd and knowledge-rag; comparison table with wins and losses | done |
+| 8 | PyPI + `uvx`, MCP registry, README rewrite, demo GIF, blog post, portfolio update | built; waiting on your decisions (name, license, publishing, posting) |
 
 ## How to resume
 

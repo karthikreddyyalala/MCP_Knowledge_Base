@@ -625,7 +625,7 @@ body::before {
         </div>
         <div class="bar-track"><div class="bar-fill fill-dim" data-w="65.2%"></div></div>
       </div>
-      <p style="color:var(--txt2);font-size:.8rem;line-height:1.6;margin-top:1rem">The top three are a statistical tie (p &gt; 0.5). qmd's GPU backend failed to compile on the test machine, so its latency is likely CPU-bound.</p>
+      <p style="color:var(--txt2);font-size:.8rem;line-height:1.6;margin-top:1rem">The top three are a statistical tie (p &gt; 0.5). On NFCorpus, qmd is ahead (0.383 vs 0.364, p = 0.02) thanks to LLM query rewriting, at about 85× the latency. qmd's GPU backend failed to compile on the test machine, so its latency is likely CPU-bound.</p>
     </div>
   </div>
 </section>

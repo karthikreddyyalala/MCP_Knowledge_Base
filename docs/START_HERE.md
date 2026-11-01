@@ -18,7 +18,7 @@ Claude can't see your private notes. This project is a small program that runs *
 
 Think of it as a librarian for your notes:
 - **`kb index`** reads your notes and files every paragraph in two catalogues: one by *meaning*, one by *exact words*.
-- When Claude asks a question, **`kb serve`** checks both catalogues, merges the best matches, has a careful second reader re-check the top 20, and hands Claude the best 5 with citations, or says **"No relevant results in your docs"** if nothing fits.
+- When Claude asks a question, **`kb serve`** checks both catalogues, merges the best matches, has a careful second reader re-check the top 20, and hands Claude the best 5 with citations. If nothing scores as clearly relevant, it adds a **"Low confidence"** note so Claude doesn't treat weak matches as answers.
 - **`kb eval`** is the part nobody else has: it writes test questions *from your own notes* with a local AI model and tells you how well search works on *your* files.
 
 It connects to Claude through **MCP** (Model Context Protocol), the standard way to give Claude tools.
@@ -48,8 +48,9 @@ QUESTION from Claude
    ▼
 top 50 by meaning + top 50 by words ─► merge by rank (RRF)
    ─► careful re-check of the top 20 (cross-encoder reranker)
-   ─► best score too low?  "No relevant results in your docs."
-   ─► otherwise: best 5 chunks + [source: file.md:L8-L14]
+   ─► best 5 chunks + [source: file.md:L8-L14]
+   ─► best score too low?  add a "Low confidence" warning
+       (hard "not found" only if you calibrate it on your docs with kb eval)
 ```
 
 Every word in that diagram is explained in [HOW_IT_WORKS.md](HOW_IT_WORKS.md#2-concepts-in-the-order-you-meet-them).
@@ -67,8 +68,8 @@ Every word in that diagram is explained in [HOW_IT_WORKS.md](HOW_IT_WORKS.md#2-c
 | 4 | Reranker + "not found" | Careful re-check of the top 20; refuse when nothing fits | Fixed FiQA; caught a bug in v1's own test set |
 | 5 | Incremental sync | Re-index only edited files; Claude picks up edits on restart | Second index run does no work |
 | 6 | `kb eval` | Test search on your own docs with a local AI model | Validated against human labels (below) |
-| 7 | Head-to-head | qmd and knowledge-rag on the same benchmark | Running |
-| 8 | Ship | PyPI install, demo, blog post, portfolio | Not started |
+| 7 | Head-to-head | qmd and knowledge-rag on the same benchmark | Tie on SciFact; qmd ahead on NFCorpus; kb ahead of knowledge-rag; 67 ms vs 0.2 s vs 5 to 7 s |
+| 8 | Ship | Packaging, offline fix, demo GIF, README, site, launch drafts | Built; waiting on your decisions |
 
 ### Headline numbers (nDCG@10: 1.0 is perfect ranking)
 
@@ -97,8 +98,9 @@ Known limits, stated in the README: synthetic questions still slightly favour ke
 2. **Half of every chunk was invisible.** Chunks were 400 words; the model reads 256 tokens and silently drops the rest. The tokenizer even reports 512, which is the trap.
 3. **Hybrid search, and why.** Meaning search finds paraphrases; word search finds exact names and codes. Merging by rank (RRF) beats either.
 4. **The "not found" feature found a bug in the test set.** Three "answerable" example questions are answered nowhere in the docs; v1 had been counting them as passes.
-5. **Correcting my own claims.** Two things I said turned out wrong when measured (model reloading; a BM25 example). Both are corrected in the build log.
-6. **Validating the evaluator.** A small model gave confident but wrong recommendations; a 7B model with a better prompt matched human labels exactly on a dataset it was never tuned on.
+5. **A demo caught a false refusal.** Recording the demo showed the "not found" threshold hiding a correct answer on short runbook text. Thresholds don't transfer between kinds of text, so the default became a warning.
+6. **Correcting my own claims.** Two things I said turned out wrong when measured (model reloading; a BM25 example). Both are corrected in the build log.
+7. **Validating the evaluator.** A small model gave confident but wrong recommendations; a 7B model with a better prompt matched human labels exactly on a dataset it was never tuned on.
 
 ---
 
@@ -130,7 +132,7 @@ uv pip install -e ".[dev]"                   # if .venv is missing: uv venv --py
 # try it
 .venv/bin/kb index ./example-docs
 .venv/bin/kb search "how do I roll back a deployment"
-.venv/bin/kb search "best pizza in naples"   # -> No relevant results in your docs.
+.venv/bin/kb search "best pizza in naples"   # -> results with a "Low confidence" warning
 
 # measure it on your own notes (needs Ollama running: `ollama serve`)
 .venv/bin/kb eval ~/path/to/your/notes
@@ -156,10 +158,11 @@ Then open [BUILD_LOG.md](BUILD_LOG.md#remaining-phases-from-the-spec) for the ne
 
 | Item | Who |
 |---|---|
-| Finish phase 7 (comparison table) | Claude (running) |
-| Phase 8: PyPI packaging, README rewrite, demo GIF script, blog draft | Claude |
-| Create a PyPI account (pypi.org) for publishing | **You** |
-| Post the blog (LinkedIn, Hacker News, r/LocalLLaMA) | **You** |
+| Pick a PyPI name (`mcp-knowledge-base` and `kb-mcp` are taken; free: `citekb`, `kb-eval`, `measured-kb`, `localkb-mcp`, ...) | **You** |
+| Choose a license (MIT is the usual choice for portfolio projects) | **You** |
+| Create a PyPI account, add a trusted publisher for `release.yml` (steps at the top of that file), then `git tag v0.2.0 && git push --tags` | **You** |
+| Look at the updated site (`docs/index.html`) in a browser before merging | **You** |
+| Post the blog: drafts in `docs/launch/` (blog post, HN, LinkedIn, Reddit) | **You** |
 | Update the portfolio card (link `MCP_Knowledge_Base`; replace the MS MARCO claim with the numbers above) | **You** (that site's code isn't in this repo) |
 | Walk through the code with `/vibe-wise:learn` so you can explain every part | **You** |
 | Merge `v2-measured-retrieval` into `main` when happy | **You** decide |
