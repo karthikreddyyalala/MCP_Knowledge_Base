@@ -70,5 +70,21 @@ def bench(
     typer.echo(f"Saved {out}")
 
 
+@app.command()
+def calibrate(
+    work_dir: Path = typer.Option(Path.home() / ".mcp-kb" / "bench", "--work-dir"),
+    results_dir: Path = typer.Option(Path("results"), "--results-dir"),
+):
+    """Pick the "not found" threshold on BEIR. Writes results/abstention.json."""
+    import json
+
+    from mcp_kb.evals import beir
+
+    r = beir.calibrate_abstention(work_dir)
+    (results_dir / "abstention.json").write_text(json.dumps(r, indent=1))
+    typer.echo(f"threshold {r['threshold']}  balanced accuracy {r['balanced_accuracy']}  "
+               f"answered {r['answered_rate']:.1%}  refused {r['abstained_rate']:.1%}")
+
+
 if __name__ == "__main__":
     app()

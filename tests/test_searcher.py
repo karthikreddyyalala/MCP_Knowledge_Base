@@ -59,3 +59,18 @@ def test_keyword_and_hybrid_modes_cite_sources(indexed_settings, mode):
     results = search("kubectl apply", dataclasses.replace(indexed_settings, search_mode=mode))
     assert results and "deploy.md" in results[0]["citation"]
     assert re.match(r"\[source: .+\.md:L\d+-L\d+\]", results[0]["citation"])
+
+
+def test_rerank_orders_by_cross_encoder_score(indexed_settings):
+    import dataclasses
+    s = dataclasses.replace(indexed_settings, rerank=True)
+    results = search("how do I deploy the app", s)
+    assert "deploy.md" in results[0]["citation"]
+    scores = [r["score"] for r in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_min_score_abstains_when_nothing_is_relevant(indexed_settings):
+    import dataclasses
+    assert search("kubectl apply", dataclasses.replace(indexed_settings, rerank=True, min_score=100.0)) == []
+    assert search("kubectl apply", dataclasses.replace(indexed_settings, rerank=True, min_score=None))

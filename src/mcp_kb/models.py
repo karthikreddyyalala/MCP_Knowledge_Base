@@ -9,3 +9,11 @@ def get_tokenizer(model_name: str):
 
     repo = model_name if "/" in model_name else f"sentence-transformers/{model_name}"
     return AutoTokenizer.from_pretrained(repo)
+
+
+@lru_cache(maxsize=None)
+def get_reranker(model_name: str):
+    """Cross-encoder that reads (query, chunk) together and scores how well they match."""
+    from sentence_transformers import CrossEncoder
+
+    return CrossEncoder(model_name)

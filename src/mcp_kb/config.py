@@ -13,3 +13,7 @@ class Settings:
     context_prefix: bool = True  # prepend "path > H1 > H2" to each chunk
     search_mode: str = "hybrid"  # "dense", "bm25" or "hybrid"; hybrid won on BEIR (see README)
     candidates: int = 50  # per-retriever candidates before fusion
+    rerank: bool = False
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_candidates: int = 50  # how many fused candidates the cross-encoder scores
+    min_score: float | None = None  # reranker score below which search answers "not found"

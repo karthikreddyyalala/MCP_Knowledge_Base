@@ -6,6 +6,7 @@ from mcp_kb.searcher import list_sources, search, warmup
 from mcp_kb.tracing import setup_tracing
 
 NOT_INDEXED = "No documents indexed. Run: kb index <path-to-your-docs>"
+NOT_FOUND = "No relevant results in your docs."
 
 
 def build_server(settings: Settings) -> MCPServer:
@@ -20,7 +21,7 @@ def build_server(settings: Settings) -> MCPServer:
         """
         results = search(query, settings)
         if not results:
-            return NOT_INDEXED if not list_sources(settings) else "No results found."
+            return NOT_INDEXED if not list_sources(settings) else NOT_FOUND
         return "\n---\n".join(f"{r['citation']}\n{r['text']}\n" for r in results)
 
     @server.tool(structured_output=False)

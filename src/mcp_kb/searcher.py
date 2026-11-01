@@ -4,6 +4,7 @@ from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunct
 from mcp_kb import bm25
 from mcp_kb.config import Settings
 from mcp_kb.fusion import rrf
+from mcp_kb.models import get_reranker
 from mcp_kb.tracing import search_span
 
 COLLECTION = "kb_docs"
@@ -24,6 +25,8 @@ def warmup(settings: Settings) -> None:
     col = _get_collection(settings)
     if col is not None and col.count():
         col.query(query_texts=["warmup"], n_results=1)
+        if settings.rerank:
+            get_reranker(settings.rerank_model).predict([("warmup", "warmup")])
 
 
 def _dense(col, query: str, n: int) -> list[dict]:
@@ -31,26 +34,48 @@ def _dense(col, query: str, n: int) -> list[dict]:
     return [{"id": i, "text": t, **m} for i, t, m in zip(r["ids"][0], r["documents"][0], r["metadatas"][0])]
 
 
+def _retrieve(col, query: str, settings: Settings, n: int) -> list[dict]:
+    if settings.search_mode == "dense":
+        return _dense(col, query, n)
+    if settings.search_mode == "bm25":
+        return bm25.query(settings.db_path, query, n)
+    dense_hits = _dense(col, query, max(n, settings.candidates))
+    keyword_hits = bm25.query(settings.db_path, query, max(n, settings.candidates))
+    by_id = {h["id"]: h for h in keyword_hits + dense_hits}
+    return [by_id[i] for i in rrf([[h["id"] for h in dense_hits], [h["id"] for h in keyword_hits]])[:n]]
+
+
+def _rerank(query: str, hits: list[dict], settings: Settings) -> list[dict]:
+    scores = get_reranker(settings.rerank_model).predict([(query, h["text"]) for h in hits])
+    for h, score in zip(hits, scores):
+        h["score"] = round(float(score), 3)
+    return sorted(hits, key=lambda h: h["score"], reverse=True)
+
+
 def search(query: str, settings: Settings) -> list[dict]:
-    """Top chunks for a query, using settings.search_mode: dense, bm25, or hybrid (RRF of both)."""
+    """Top chunks for a query.
+
+    1. retrieve candidates with settings.search_mode (dense, bm25, or hybrid = RRF of both)
+    2. optionally rerank them with a cross-encoder
+    3. return [] ("not found") if the best reranked score is below settings.min_score
+    """
     if settings.search_mode not in MODES:
         raise ValueError(f"search_mode must be one of {MODES}, got {settings.search_mode!r}")
     col = _get_collection(settings)
     if col is None:
         return []
     with search_span(query) as span:
-        if settings.search_mode == "dense":
-            hits = _dense(col, query, settings.top_k)
-        elif settings.search_mode == "bm25":
-            hits = bm25.query(settings.db_path, query, settings.top_k)
-        else:
-            dense_hits = _dense(col, query, settings.candidates)
-            keyword_hits = bm25.query(settings.db_path, query, settings.candidates)
-            by_id = {h["id"]: h for h in keyword_hits + dense_hits}
-            fused = rrf([[h["id"] for h in dense_hits], [h["id"] for h in keyword_hits]])
-            hits = [by_id[i] for i in fused[: settings.top_k]]
-        output = [{"text": h["text"], "source": h["source"],
-                   "citation": f"[source: {h['source']}:L{h['start_line']}-L{h['end_line']}]"} for h in hits]
+        n = max(settings.top_k, settings.rerank_candidates) if settings.rerank else settings.top_k
+        hits = _retrieve(col, query, settings, n)
+        if settings.rerank and hits:
+            # rerank the head; anything past rerank_candidates keeps its retrieval order
+            k = settings.rerank_candidates
+            hits = _rerank(query, hits[:k], settings) + hits[k:]
+            if settings.min_score is not None and hits[0]["score"] < settings.min_score:
+                hits = []
+        output = [{"text": h["text"], "source": h["source"], "score": h.get("score"),
+                   "citation": f"[source: {h['source']}:L{h['start_line']}-L{h['end_line']}]"}
+                  for h in hits[: settings.top_k]]
         span.record_results(output)
     return output
 
