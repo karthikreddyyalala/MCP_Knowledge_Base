@@ -45,9 +45,16 @@ def test_doc_ids_from_chunks_dedupes_in_rank_order():
 
 def test_run_end_to_end(tmp_path):
     corpus, queries, qrels = load(_fake_dataset(tmp_path))
-    result = run("fake", corpus, queries, qrels, tmp_path / "work", setup="v1-dense")
+    result = run("fake", corpus, queries, qrels, tmp_path / "work", setup="dense")
     m = result["metrics"]
     assert {"ndcg@10", "recall@10", "mrr@10", "p50_ms", "p95_ms", "n_queries"} <= set(m)
     assert m["n_queries"] == 2
     assert result["run"]["q2"][0] == "d3"
     assert m["mrr@10"] == 1.0
+
+
+def test_setups_with_different_chunking_get_separate_indexes(tmp_path):
+    corpus, queries, qrels = load(_fake_dataset(tmp_path))
+    run("fake", corpus, queries, qrels, tmp_path / "work", setup="dense")
+    run("fake", corpus, queries, qrels, tmp_path / "work", setup="dense-no-prefix")
+    assert len(list((tmp_path / "work" / "fake").glob("chroma-*"))) == 2

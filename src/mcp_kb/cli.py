@@ -47,7 +47,7 @@ def serve(
 @app.command()
 def bench(
     dataset: str = typer.Option(..., "--dataset", help="scifact, nfcorpus or fiqa"),
-    setup: str = typer.Option("v1-dense", "--setup", help="Search setup to measure"),
+    setup: str = typer.Option("dense", "--setup", help="Search setup to measure"),
     work_dir: Path = typer.Option(Path.home() / ".mcp-kb" / "bench", "--work-dir", help="Downloads and indexes"),
     results_dir: Path = typer.Option(Path("results"), "--results-dir", help="Where result JSON is written"),
 ):

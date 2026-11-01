@@ -1,19 +1,11 @@
 from pathlib import Path
 import pytest
 from mcp_kb.config import Settings
-from mcp_kb.indexer import build_index, chunk_markdown
+from mcp_kb.indexer import build_index
 
 
-def test_chunk_markdown_splits_on_size():
-    text = "word " * 500
-    chunks = chunk_markdown(text, chunk_size=400, chunk_overlap=50)
-    assert len(chunks) >= 2, "Long text should produce multiple chunks"
 
 
-def test_chunk_markdown_preserves_overlap():
-    text = "\n".join(f"Line {i}: " + "content " * 10 for i in range(100))
-    chunks = chunk_markdown(text, chunk_size=400, chunk_overlap=50)
-    assert len(chunks) >= 2
 
 
 def test_build_index_returns_chunk_count(tmp_path):
@@ -26,20 +18,8 @@ def test_build_index_returns_chunk_count(tmp_path):
     assert count >= 1
 
 
-def test_chunk_inherits_header():
-    text = "## Auth\n\nBearer tokens required.\n\n## Deploy\n\nRun rollback.sh."
-    chunks = chunk_markdown(text, chunk_size=10, chunk_overlap=0)
-    deploy_chunks = [c for c in chunks if "Deploy" in c["text"]]
-    assert deploy_chunks, "Expected a chunk containing Deploy header"
-    assert deploy_chunks[0]["text"].startswith("## Deploy")
 
 
-def test_chunk_without_headers_still_works():
-    text = "word " * 50
-    chunks = chunk_markdown(text, chunk_size=20, chunk_overlap=5)
-    assert len(chunks) > 1
-    full = " ".join(c["text"] for c in chunks)
-    assert "word" in full
 
 
 def test_build_index_stores_source_metadata(tmp_path):

@@ -4,7 +4,9 @@ Indexes each BEIR document as `<doc_id>.md` through the real `build_index` and q
 through the real `search`, so the numbers measure the product, not a separate script.
 """
 import csv
+import dataclasses
 import datetime
+import hashlib
 import importlib.metadata as md
 import json
 import platform
@@ -27,10 +29,13 @@ K = 10
 CANDIDATE_CHUNKS = 30  # chunks fetched per query; several can belong to the same doc
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
 
-# setup name -> search function. Later phases add hybrid / rerank here.
-SETUPS: dict[str, Callable[[str, Settings], list[dict]]] = {
-    "v1-dense": search,
+# setup name -> (Settings overrides, search function). Later phases add hybrid / rerank here.
+# Results for "v1-dense" (400-word chunks) were produced at commit 1016550 and are kept as history.
+SETUPS: dict[str, tuple[dict, Callable[[str, Settings], list[dict]]]] = {
+    "dense": ({}, search),
+    "dense-no-prefix": ({"context_prefix": False}, search),
 }
+INDEX_FIELDS = ("model_name", "max_tokens", "overlap_tokens", "context_prefix")
 
 
 def download(name: str, root: Path) -> Path:
@@ -82,19 +87,18 @@ def doc_ids_from_chunks(results: list[dict]) -> list[str]:
     return list(dict.fromkeys(Path(r["source"]).stem for r in results))
 
 
-def _index_settings(work: Path) -> Settings:
-    return Settings(docs_path=work / "docs", db_path=work / "chroma", top_k=CANDIDATE_CHUNKS)
-
-
-def _ensure_index(corpus: dict, work: Path) -> Settings:
-    """Build the index once per dataset and chunking config; reuse it across setups."""
-    settings = _index_settings(work)
-    marker = work / "index.json"
-    config = {"n_docs": len(corpus), "model": settings.model_name,
-              "chunk_size": settings.chunk_size, "chunk_overlap": settings.chunk_overlap}
+def _ensure_index(corpus: dict, work: Path, overrides: dict) -> Settings:
+    """Build one index per dataset and chunking config; setups that share a config share the index."""
+    base = Settings(**overrides)
+    config = {f: getattr(base, f) for f in INDEX_FIELDS} | {"n_docs": len(corpus)}
+    key = hashlib.sha1(json.dumps(config, sort_keys=True).encode()).hexdigest()[:10]
+    settings = dataclasses.replace(base, docs_path=work / "docs", db_path=work / f"chroma-{key}",
+                                   top_k=CANDIDATE_CHUNKS)
+    marker = settings.db_path / "index.json"
     if marker.exists() and json.loads(marker.read_text()) == config:
         return settings
-    write_corpus(corpus, settings.docs_path)
+    if not any(settings.docs_path.glob("*.md")):
+        write_corpus(corpus, settings.docs_path)
     build_index(settings)
     marker.write_text(json.dumps(config))
     return settings
@@ -109,14 +113,13 @@ def _environment(settings: Settings) -> dict:
         "chromadb": v("chromadb"),
         "sentence-transformers": v("sentence-transformers"),
         "model": settings.model_name,
-        "chunk_size": settings.chunk_size,
-        "chunk_overlap": settings.chunk_overlap,
+        **{f: getattr(settings, f) for f in INDEX_FIELDS if f != "model_name"},
     }
 
 
 def run(name: str, corpus: dict, queries: dict, qrels: dict, work_dir: Path, setup: str) -> dict:
-    settings = _ensure_index(corpus, work_dir / name)
-    search_fn = SETUPS[setup]
+    overrides, search_fn = SETUPS[setup]
+    settings = _ensure_index(corpus, work_dir / name, overrides)
     search_fn("warmup", settings)  # keep model load out of the latency numbers
 
     ranked_run, latencies = {}, []
