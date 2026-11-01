@@ -44,5 +44,31 @@ def serve(
     server.run(Settings(docs_path=docs, db_path=db))
 
 
+@app.command()
+def bench(
+    dataset: str = typer.Option(..., "--dataset", help="scifact, nfcorpus or fiqa"),
+    setup: str = typer.Option("v1-dense", "--setup", help="Search setup to measure"),
+    work_dir: Path = typer.Option(Path.home() / ".mcp-kb" / "bench", "--work-dir", help="Downloads and indexes"),
+    results_dir: Path = typer.Option(Path("results"), "--results-dir", help="Where result JSON is written"),
+):
+    """Benchmark a search setup on a BEIR dataset. Writes results/<dataset>/<setup>.json."""
+    from mcp_kb.evals import beir  # imported here so normal commands stay fast
+
+    if dataset not in beir.DATASETS:
+        raise typer.BadParameter(f"choose one of {', '.join(beir.DATASETS)}", param_hint="--dataset")
+    if setup not in beir.SETUPS:
+        raise typer.BadParameter(f"choose one of {', '.join(beir.SETUPS)}", param_hint="--setup")
+
+    typer.echo(f"Loading {dataset}...")
+    corpus, queries, qrels = beir.load(beir.download(dataset, work_dir / "datasets"))
+    typer.echo(f"{len(corpus):,} docs, {len(queries):,} queries. Indexing (first run only) and searching...")
+    result = beir.run(dataset, corpus, queries, qrels, work_dir / "indexes", setup)
+    out = beir.save(result, results_dir)
+    m = result["metrics"]
+    typer.echo(f"{dataset} / {setup}: nDCG@10 {m['ndcg@10']:.3f}  Recall@10 {m['recall@10']:.3f}  "
+               f"MRR@10 {m['mrr@10']:.3f}  p50 {m['p50_ms']} ms")
+    typer.echo(f"Saved {out}")
+
+
 if __name__ == "__main__":
     app()
