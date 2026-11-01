@@ -1,6 +1,7 @@
 from pathlib import Path
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+from mcp_kb import bm25
 from mcp_kb.chunking import chunk_markdown
 from mcp_kb.config import Settings
 from mcp_kb.models import get_tokenizer
@@ -32,6 +33,8 @@ def build_index(settings: Settings) -> int:
             metas.append({"source": source, "start_line": chunk["start_line"], "end_line": chunk["end_line"]})
             ids.append(f"chunk_{chunk_id}")
             chunk_id += 1
+
+    bm25.write(settings.db_path, [{"id": i, "text": t, **m} for i, t, m in zip(ids, docs, metas)])
 
     # Chroma rejects a single add() above its max batch size, so large folders go in batches.
     batch = client.get_max_batch_size()

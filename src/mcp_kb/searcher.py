@@ -1,10 +1,13 @@
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+
+from mcp_kb import bm25
 from mcp_kb.config import Settings
+from mcp_kb.fusion import rrf
 from mcp_kb.tracing import search_span
 
-
 COLLECTION = "kb_docs"
+MODES = ("dense", "bm25", "hybrid")
 
 
 def _get_collection(settings: Settings):
@@ -23,16 +26,31 @@ def warmup(settings: Settings) -> None:
         col.query(query_texts=["warmup"], n_results=1)
 
 
+def _dense(col, query: str, n: int) -> list[dict]:
+    r = col.query(query_texts=[query], n_results=n, include=["documents", "metadatas"])
+    return [{"id": i, "text": t, **m} for i, t, m in zip(r["ids"][0], r["documents"][0], r["metadatas"][0])]
+
+
 def search(query: str, settings: Settings) -> list[dict]:
+    """Top chunks for a query, using settings.search_mode: dense, bm25, or hybrid (RRF of both)."""
+    if settings.search_mode not in MODES:
+        raise ValueError(f"search_mode must be one of {MODES}, got {settings.search_mode!r}")
     col = _get_collection(settings)
     if col is None:
         return []
     with search_span(query) as span:
-        results = col.query(query_texts=[query], n_results=settings.top_k, include=["documents", "metadatas"])
-        output = []
-        for text, meta in zip(results["documents"][0], results["metadatas"][0]):
-            citation = f"[source: {meta['source']}:L{meta['start_line']}-L{meta['end_line']}]"
-            output.append({"text": text, "source": meta["source"], "citation": citation})
+        if settings.search_mode == "dense":
+            hits = _dense(col, query, settings.top_k)
+        elif settings.search_mode == "bm25":
+            hits = bm25.query(settings.db_path, query, settings.top_k)
+        else:
+            dense_hits = _dense(col, query, settings.candidates)
+            keyword_hits = bm25.query(settings.db_path, query, settings.candidates)
+            by_id = {h["id"]: h for h in keyword_hits + dense_hits}
+            fused = rrf([[h["id"] for h in dense_hits], [h["id"] for h in keyword_hits]])
+            hits = [by_id[i] for i in fused[: settings.top_k]]
+        output = [{"text": h["text"], "source": h["source"],
+                   "citation": f"[source: {h['source']}:L{h['start_line']}-L{h['end_line']}]"} for h in hits]
         span.record_results(output)
     return output
 

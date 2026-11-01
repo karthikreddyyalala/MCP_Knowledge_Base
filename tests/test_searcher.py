@@ -51,3 +51,11 @@ def test_empty_index_returns_nothing(tmp_path):
     settings = Settings(db_path=tmp_path / "empty")
     assert search("anything", settings) == []
     assert list_sources(settings) == []
+
+
+@pytest.mark.parametrize("mode", ["bm25", "hybrid"])
+def test_keyword_and_hybrid_modes_cite_sources(indexed_settings, mode):
+    import dataclasses
+    results = search("kubectl apply", dataclasses.replace(indexed_settings, search_mode=mode))
+    assert results and "deploy.md" in results[0]["citation"]
+    assert re.match(r"\[source: .+\.md:L\d+-L\d+\]", results[0]["citation"])

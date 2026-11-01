@@ -11,3 +11,5 @@ class Settings:
     max_tokens: int = 256  # all-MiniLM-L6-v2 reads at most 256 tokens; the rest would be dropped
     overlap_tokens: int = 32
     context_prefix: bool = True  # prepend "path > H1 > H2" to each chunk
+    search_mode: str = "dense"  # "dense", "bm25" or "hybrid"
+    candidates: int = 50  # per-retriever candidates before fusion

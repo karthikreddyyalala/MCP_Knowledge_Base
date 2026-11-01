@@ -1,6 +1,8 @@
 """Retrieval regression gate: fails if search quality on example-docs drops below the v1 baseline."""
 from pathlib import Path
 
+import pytest
+
 from mcp_kb.config import Settings
 from mcp_kb.indexer import build_index
 from mcp_kb.searcher import search
@@ -35,8 +37,14 @@ GOLD = [
 ]
 
 
-def test_example_docs_retrieval_does_not_regress(tmp_path):
-    settings = Settings(docs_path=EXAMPLE_DOCS, db_path=tmp_path / "chroma")
+# Recorded baselines (min Recall@5, min MRR). BM25 alone misses "what Slack channels should I join":
+# the runbook mentions Slack, so keyword matching picks it over onboarding.md. Dense and hybrid get it.
+BASELINES = {"dense": (1.0, 0.90), "bm25": (0.95, 0.85), "hybrid": (1.0, 0.90)}
+
+
+@pytest.mark.parametrize("mode", list(BASELINES))
+def test_example_docs_retrieval_does_not_regress(tmp_path, mode):
+    settings = Settings(docs_path=EXAMPLE_DOCS, db_path=tmp_path / "chroma", search_mode=mode)
     build_index(settings)
     reciprocal_ranks = []
     for question, expected in GOLD:
@@ -44,5 +52,6 @@ def test_example_docs_retrieval_does_not_regress(tmp_path):
         reciprocal_ranks.append(1 / (sources.index(expected) + 1) if expected in sources else 0.0)
     recall = sum(rr > 0 for rr in reciprocal_ranks) / len(GOLD)
     mrr = sum(reciprocal_ranks) / len(GOLD)
-    assert recall == 1.0, f"Recall@5 dropped to {recall:.3f}"
-    assert mrr >= 0.90, f"MRR dropped to {mrr:.3f} (baseline 0.925)"
+    min_recall, min_mrr = BASELINES[mode]
+    assert recall >= min_recall, f"{mode}: Recall@5 dropped to {recall:.3f}"
+    assert mrr >= min_mrr, f"{mode}: MRR dropped to {mrr:.3f}"
