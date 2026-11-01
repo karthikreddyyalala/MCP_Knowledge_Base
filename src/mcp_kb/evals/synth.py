@@ -18,7 +18,7 @@ from mcp_kb.config import Settings
 from mcp_kb.evals.llm import Generate
 from mcp_kb.searcher import _get_collection, search
 
-MIN_WORDS = 25  # chunks shorter than this are mostly headings or fragments
+MIN_WORDS = 12  # chunks shorter than this are mostly headings or fragments
 MAX_OVERLAP = 0.75  # ponytail: fixed cut-off; tune if review shows good questions being dropped
 STOPWORDS = set(
     "a an the is are was were be been being do does did how what when where which who whom why can could should "

@@ -52,19 +52,28 @@ def bench(
     setup: str = typer.Option("dense", "--setup", help="Search setup to measure"),
     work_dir: Path = typer.Option(Path.home() / ".mcp-kb" / "bench", "--work-dir", help="Downloads and indexes"),
     results_dir: Path = typer.Option(Path("results"), "--results-dir", help="Where result JSON is written"),
+    tool_bin: Optional[Path] = typer.Option(None, "--tool-bin", help="Executable for an external tool setup"),
 ):
     """Benchmark a search setup on a BEIR dataset. Writes results/<dataset>/<setup>.json."""
     from mcp_kb.evals import beir  # imported here so normal commands stay fast
 
     if dataset not in beir.DATASETS:
         raise typer.BadParameter(f"choose one of {', '.join(beir.DATASETS)}", param_hint="--dataset")
-    if setup not in beir.SETUPS:
-        raise typer.BadParameter(f"choose one of {', '.join(beir.SETUPS)}", param_hint="--setup")
+    from mcp_kb.evals.adapters import ADAPTERS
+
+    if setup not in beir.SETUPS and setup not in ADAPTERS:
+        raise typer.BadParameter(f"choose one of {', '.join([*beir.SETUPS, *ADAPTERS])}", param_hint="--setup")
+    if setup in ADAPTERS and tool_bin is None:
+        raise typer.BadParameter(f"--tool-bin is required for {setup} (path to its executable)", param_hint="--tool-bin")
 
     typer.echo(f"Loading {dataset}...")
     corpus, queries, qrels = beir.load(beir.download(dataset, work_dir / "datasets"))
     typer.echo(f"{len(corpus):,} docs, {len(queries):,} queries. Indexing (first run only) and searching...")
-    result = beir.run(dataset, corpus, queries, qrels, work_dir / "indexes", setup)
+    if setup in ADAPTERS:
+        result = beir.run_external(dataset, corpus, queries, qrels, work_dir / "indexes", setup, tool_bin,
+                                   log=lambda m: typer.echo(m, err=True))
+    else:
+        result = beir.run(dataset, corpus, queries, qrels, work_dir / "indexes", setup)
     out = beir.save(result, results_dir)
     m = result["metrics"]
     typer.echo(f"{dataset} / {setup}: nDCG@10 {m['ndcg@10']:.3f}  Recall@10 {m['recall@10']:.3f}  "

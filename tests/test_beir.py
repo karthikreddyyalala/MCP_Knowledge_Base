@@ -58,3 +58,11 @@ def test_setups_with_different_chunking_get_separate_indexes(tmp_path):
     run("fake", corpus, queries, qrels, tmp_path / "work", setup="dense")
     run("fake", corpus, queries, qrels, tmp_path / "work", setup="dense-no-prefix")
     assert len(list((tmp_path / "work" / "fake").glob("chroma-*"))) == 2
+
+
+def test_external_doc_ids_map_paths_case_insensitively():
+    from mcp_kb.evals.adapters import doc_ids
+
+    known = {"med-10": "MED-10", "d2": "d2"}
+    paths = ["beir/med-10.md", "/abs/documents/MED-10.md", "beir/d2.md", "beir/unknown.md"]
+    assert doc_ids(paths, known) == ["MED-10", "d2"]

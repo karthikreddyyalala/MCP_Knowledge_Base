@@ -128,18 +128,8 @@ def _environment(settings: Settings) -> dict:
     }
 
 
-def run(name: str, corpus: dict, queries: dict, qrels: dict, work_dir: Path, setup: str) -> dict:
-    overrides, search_fn = SETUPS[setup]
-    settings = _ensure_index(corpus, work_dir / name, overrides)
-    search_fn("warmup", settings)  # keep model load out of the latency numbers
-
-    ranked_run, latencies = {}, []
-    for qid, text in queries.items():
-        t = time.perf_counter()
-        hits = search_fn(text, settings)
-        latencies.append((time.perf_counter() - t) * 1000)
-        ranked_run[qid] = doc_ids_from_chunks(hits)[:K]
-
+def _result(name: str, setup: str, corpus: dict, queries: dict, qrels: dict,
+            ranked_run: dict, latencies: list[float], environment: dict) -> dict:
     per_q = lambda f: mean([f(ranked_run[q], qrels[q], K) for q in queries])  # noqa: E731
     p95 = statistics.quantiles(latencies, n=20)[-1] if len(latencies) > 1 else latencies[0]
     return {
@@ -154,10 +144,48 @@ def run(name: str, corpus: dict, queries: dict, qrels: dict, work_dir: Path, set
             "n_queries": len(queries),
             "n_docs": len(corpus),
         },
-        "environment": _environment(settings),
+        "environment": environment,
         "per_query": {q: round(ndcg_at_k(ranked_run[q], qrels[q], K), 4) for q in queries},
         "run": ranked_run,
     }
+
+
+def run(name: str, corpus: dict, queries: dict, qrels: dict, work_dir: Path, setup: str) -> dict:
+    overrides, search_fn = SETUPS[setup]
+    settings = _ensure_index(corpus, work_dir / name, overrides)
+    search_fn("warmup", settings)  # keep model load out of the latency numbers
+
+    ranked_run, latencies = {}, []
+    for qid, text in queries.items():
+        t = time.perf_counter()
+        hits = search_fn(text, settings)
+        latencies.append((time.perf_counter() - t) * 1000)
+        ranked_run[qid] = doc_ids_from_chunks(hits)[:K]
+    return _result(name, setup, corpus, queries, qrels, ranked_run, latencies, _environment(settings))
+
+
+def run_external(name: str, corpus: dict, queries: dict, qrels: dict, work_dir: Path,
+                 system: str, binary: Path, log=lambda m: None) -> dict:
+    """Benchmark another tool (see evals/adapters.py) on the same files, queries and metrics."""
+    import asyncio
+
+    from mcp_kb.evals.adapters import ADAPTERS, run_queries
+
+    adapter = ADAPTERS[system](system, binary)
+    docs = work_dir / name / "docs"
+    if not any(docs.glob("*.md")):
+        write_corpus(corpus, docs)
+    work = work_dir / name / system
+    t = time.perf_counter()
+    log(f"{system}: indexing {len(corpus):,} docs (first run only)")
+    adapter.prepare(docs, work)
+    index_s = time.perf_counter() - t
+    id_map = {did.lower(): did for did in corpus}
+    ranked_run, latencies = asyncio.run(run_queries(adapter, work, queries, id_map, K, log))
+    env = {"date": datetime.date.today().isoformat(), "python": platform.python_version(),
+           "machine": f"{platform.system()} {platform.machine()}", "system": system,
+           "version": adapter.version(), "settings": "tool defaults", "prepare_seconds": round(index_s, 1)}
+    return _result(name, system, corpus, queries, qrels, ranked_run, latencies, env)
 
 
 def save(result: dict, results_dir: Path) -> Path:
