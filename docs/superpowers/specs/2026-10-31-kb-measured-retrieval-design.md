@@ -40,7 +40,7 @@ Signature feature: `kb eval`, which generates a test set from the user's own doc
 |---|---|---|
 | 400-word chunks | `all-MiniLM-L6-v2` reads 256 tokens; the rest is silently dropped | Chunks of at most 256 tokens, measured with the model's own tokenizer |
 | `source = md_file.name` | Files with the same name collide | Path relative to the docs root |
-| Model and DB loaded on every query | Seconds per call | Loaded once per process, warmed at server start |
+| Model loaded on the first query | 2.3 s cold start on the user's first question | Warmed at server start (done in phase 0: first search 11 ms) |
 | Dense search only | Misses exact names, error codes, IDs | Hybrid: dense + BM25, fused with RRF |
 | Always returns 5 chunks | Irrelevant context when nothing matches | Cross-encoder rerank plus a calibrated "not found" threshold |
 | Full rebuild every index | Slow on large folders | Incremental, by file content hash |

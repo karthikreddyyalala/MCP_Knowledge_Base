@@ -1,6 +1,6 @@
 # MCP Knowledge Base
 
-![CI](https://github.com/karthikreddyyalala/MCP_Base/actions/workflows/tests.yml/badge.svg)
+![CI](https://github.com/karthikreddyyalala/MCP_Knowledge_Base/actions/workflows/tests.yml/badge.svg)
 
 **[mcp-kb-site.vercel.app](https://mcp-kb-site.vercel.app)**
 
@@ -22,9 +22,9 @@ You could upload them manually every conversation. But that sends your internal 
 
 Two steps:
 
-**Index** - run `index.py` once. It reads your `.md` files, splits them into 400-token chunks (50-token overlap so nothing gets cut mid-sentence), embeds each chunk with `all-MiniLM-L6-v2`, and saves everything to ChromaDB on your local disk. The model downloads once from HuggingFace, then all inference is offline.
+**Index** - run `kb index` once. It reads your `.md` files, splits them into 400-token chunks (50-token overlap so nothing gets cut mid-sentence), embeds each chunk with `all-MiniLM-L6-v2`, and saves everything to ChromaDB on your local disk. The model downloads once from HuggingFace, then all inference is offline.
 
-**Serve** - `server.py` runs in the background and registers two tools with Claude Desktop over stdio: `search_docs` and `list_docs`. When you ask Claude a question, it calls `search_docs`, gets back the top 5 relevant chunks with line citations, and answers from there.
+**Serve** - `kb serve` runs in the background and registers two tools with Claude Desktop over stdio: `search_docs` and `list_docs`. When you ask Claude a question, it calls `search_docs`, gets back the top 5 relevant chunks with line citations, and answers from there.
 
 The docs never leave your machine. Only the retrieved snippet (one paragraph, basically) enters the conversation.
 
@@ -35,40 +35,40 @@ The docs never leave your machine. Only the retrieved snippet (one paragraph, ba
 ```bash
 git clone https://github.com/karthikreddyyalala/MCP_Knowledge_Base.git
 cd MCP_Knowledge_Base
-pip install -e .
+uv venv && uv pip install -e .
 
-python3 index.py --docs ./example-docs
+.venv/bin/kb index ./example-docs
+.venv/bin/kb search "how do I roll back a deployment"
 ```
 
-Test the server starts:
-```bash
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}\n' \
-  | PYTHONPATH=. python3 src/server.py
-```
+`kb search` returns exactly what Claude will see, so you can check results before connecting anything.
 
 ---
 
-## Connect to Claude Desktop
+## Connect to Claude
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` on Mac:
+**Claude Code:**
+
+```bash
+claude mcp add kb -- /absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb serve
+```
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on Mac):
 
 ```json
 {
   "mcpServers": {
     "knowledge-base": {
-      "command": "python3",
-      "args": ["/absolute/path/to/src/server.py"],
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/MCP_Knowledge_Base",
-        "KB_DOCS_PATH": "/path/to/your/docs",
-        "KB_DB_PATH": "/Users/yourname/.mcp-kb/chroma"
-      }
+      "command": "/absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb",
+      "args": ["serve"]
     }
   }
 }
 ```
 
-Restart Claude Desktop. Hammer icon appears in the chat input. Try asking: *"how do I roll back a bad deployment?"*
+The index lives in `~/.mcp-kb/chroma` by default. Use `--db <path>` (or `KB_DB_PATH`) on both `kb index` and `kb serve` to change it.
+
+Restart Claude Desktop and try: *"how do I roll back a bad deployment?"*
 
 ---
 
@@ -96,9 +96,9 @@ Line number means you can open the file and verify it. That matters more than it
 ## Tracing with Arize Phoenix
 
 ```bash
-pip install -e ".[tracing]"
+uv pip install -e ".[tracing]"
 python3 -m phoenix.server.main serve   # opens http://localhost:6006
-PHOENIX_ENABLED=1 PYTHONPATH=. python3 src/server.py
+PHOENIX_ENABLED=1 .venv/bin/kb serve
 ```
 
 Shows every `search_docs` call as a retrieval span - query text, which chunks were returned, citation metadata. Useful for debugging why a bad answer came back.
@@ -134,27 +134,14 @@ Used Phoenix over RAGAS because this project is a retriever, not a generator. RA
 ## Tests
 
 ```bash
-pytest tests/ -v
+uv pip install -e ".[dev]"
+.venv/bin/python -m pytest tests -q
 ```
 
-10 tests - chunking logic, index construction, search result format, citation format, source listing.
+Covers chunking, index building, citations, relative-path sources, the empty-index message, the MCP server end to end over stdio, and a retrieval regression gate that fails if search quality on `example-docs` drops (Recall@5 1.000, MRR 0.925 baseline).
 
 ---
 
-## Benchmark
+## Benchmarks
 
-MS MARCO passage ranking, dev set. Reservoir-sampled 1.1M passages from the full 8.8M corpus (keeping all qrel-relevant passages), indexed, then evaluated MRR@10 against 6,980 official queries.
-
-```
-MRR@10 = 0.585   ████████████████████████████████████████████████████
-BM25   = 0.167   ██████████████
-
-3.5× above the keyword search baseline.
-```
-
-First run ~90 min. Subsequent runs ~20 min (cached index at `~/.mcp-kb/msmarco`).
-
-```bash
-pip install -e ".[benchmark]"
-PYTHONPATH=. python3 scripts/eval_msmarco.py
-```
+v2 is in progress: BEIR evaluation (SciFact, NFCorpus, FiQA) with a dense / BM25 / hybrid / hybrid + rerank ablation, run identically against other local retrieval tools. Results will be published here with the command to reproduce them.
