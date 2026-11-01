@@ -81,7 +81,9 @@ def build_index(settings: Settings) -> int:
             ids.append(f"chunk_{chunk_id}")
             chunk_id += 1
 
-    if docs:
-        col.add(documents=docs, metadatas=metas, ids=ids)
+    # Chroma rejects a single add() above its max batch size, so large folders go in batches.
+    batch = client.get_max_batch_size()
+    for i in range(0, len(docs), batch):
+        col.add(documents=docs[i:i + batch], metadatas=metas[i:i + batch], ids=ids[i:i + batch])
 
     return len(docs)
