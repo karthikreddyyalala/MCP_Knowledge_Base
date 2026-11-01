@@ -171,6 +171,7 @@ The PyPI name is checked in phase 7. Fallback: `kb-mcp`.
 4. The README table shows every dataset, including the ones where `kb` loses.
 5. The metric code is cross-checked against `ranx` in a test.
 6. The MS MARCO script and its numbers are removed, not kept alongside.
+7. Every ablation row reports a paired randomization test (per-query nDCG@10) against the previous row. Differences with p >= 0.05 are described as noise, not wins. (Added after phase 2, where most deltas were within noise.)
 
 ## 11. Testing
 

@@ -146,16 +146,22 @@ Covers chunking, index building, citations, relative-path sources, the empty-ind
 
 Measured on [BEIR](https://github.com/beir-cellar/beir) test sets. Each document is written to a markdown file and goes through the real `kb index` and `search` code, so these numbers measure the product, not a separate script.
 
-| Dataset | Setup | nDCG@10 | Recall@10 | MRR@10 | p50 latency |
-|---|---|---|---|---|---|
-| SciFact (5.2k docs, 300 queries) | v1 dense | 0.652 | 0.782 | 0.614 | 7 ms |
-| NFCorpus (3.6k docs, 323 queries) | v1 dense | 0.309 | 0.150 | 0.496 | 7 ms |
-| FiQA (57.6k docs, 648 queries) | v1 dense | 0.362 | 0.432 | 0.436 | 7 ms |
+nDCG@10 (higher is better). `p` is a paired randomization test against the row above it; below 0.05 means the difference is unlikely to be noise.
 
-These match published `all-MiniLM-L6-v2` results within about one point, which is the sanity check that the pipeline is sound. This is the v1 baseline; hybrid search and reranking rows are added as they land. Full results: [results/summary.md](results/summary.md).
+| Setup | SciFact | NFCorpus | FiQA |
+|---|---|---|---|
+| v1: 400-word chunks, dense | 0.652 | 0.309 | 0.362 |
+| 256-token chunks + `path > heading` prefix | 0.659 (p=0.46) | **0.323 (p=0.047)** | 0.354 (p=0.25) |
+| same, prefix removed | 0.638 (p=0.07) | 0.317 (p=0.29) | 0.366 (p=0.07) |
+
+What this shows:
+- **Token-sized chunks are a correctness fix more than a score boost.** v1 chunks were ~520 tokens and the model reads 256, so half of each chunk was never searchable. BEIR documents are mostly short, so the gain is small here (significant only on NFCorpus); long documents like runbooks lose far more text under v1.
+- **The prefix helps when it carries meaning.** It repeats the title on every chunk, which helps SciFact. FiQA documents have no titles, so the prefix is just a numeric file name, and it slightly hurts. On real docs the path (`ops/deployment-runbook`) is meaningful, so the prefix stays on by default.
+
+v1 baseline matches published `all-MiniLM-L6-v2` results within about a point, which confirms the pipeline. All results with latency: [results/summary.md](results/summary.md). The v1 row was produced at commit `1016550`.
 
 Reproduce any row:
 
 ```bash
-.venv/bin/kb bench --dataset scifact   # also nfcorpus, fiqa
+.venv/bin/kb bench --dataset scifact --setup dense   # datasets: scifact, nfcorpus, fiqa
 ```
