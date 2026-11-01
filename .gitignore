@@ -8,3 +8,6 @@ build/
 .venv/
 venv/
 ~/.mcp-kb/
+.DS_Store
+.pytest_cache/
+.vibe-wise/
