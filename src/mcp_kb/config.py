@@ -1,4 +1,6 @@
-from dataclasses import dataclass, field
+import datetime
+import json
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 
@@ -19,3 +21,21 @@ class Settings:
     # Below this reranker score, search answers "not found". Calibrated in results/abstention.json:
     # answers 97% of answerable BEIR queries and refuses 70% of off-topic ones. None = never refuse.
     min_score: float | None = -6.57
+
+
+CALIBRATION_FILE = "calibration.json"
+
+
+def save_calibration(db_path: Path, min_score: float, source: str) -> None:
+    """Store a "not found" threshold next to the index (written by kb eval --save-threshold)."""
+    db_path.mkdir(parents=True, exist_ok=True)
+    (db_path / CALIBRATION_FILE).write_text(json.dumps(
+        {"min_score": min_score, "source": source, "date": datetime.date.today().isoformat()}))
+
+
+def with_calibration(settings: Settings) -> Settings:
+    """Use the threshold calibrated on this index's own docs, if kb eval saved one."""
+    path = settings.db_path / CALIBRATION_FILE
+    if not path.exists():
+        return settings
+    return replace(settings, min_score=json.loads(path.read_text())["min_score"])

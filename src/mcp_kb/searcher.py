@@ -74,6 +74,7 @@ def search(query: str, settings: Settings) -> list[dict]:
             if settings.min_score is not None and hits[0]["score"] < settings.min_score:
                 hits = []
         output = [{"text": h["text"], "source": h["source"], "score": h.get("score"),
+                   "start_line": h["start_line"], "end_line": h["end_line"],
                    "citation": f"[source: {h['source']}:L{h['start_line']}-L{h['end_line']}]"}
                   for h in hits[: settings.top_k]]
         span.record_results(output)
