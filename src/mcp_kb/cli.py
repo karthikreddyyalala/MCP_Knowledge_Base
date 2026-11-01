@@ -74,16 +74,19 @@ def bench(
 def calibrate(
     work_dir: Path = typer.Option(Path.home() / ".mcp-kb" / "bench", "--work-dir"),
     results_dir: Path = typer.Option(Path("results"), "--results-dir"),
+    setup: str = typer.Option("hybrid-rerank20", "--setup"),
 ):
     """Pick the "not found" threshold on BEIR. Writes results/abstention.json."""
     import json
 
     from mcp_kb.evals import beir
 
-    r = beir.calibrate_abstention(work_dir)
+    r = beir.calibrate_abstention(work_dir, setup)
     (results_dir / "abstention.json").write_text(json.dumps(r, indent=1))
-    typer.echo(f"threshold {r['threshold']}  balanced accuracy {r['balanced_accuracy']}  "
-               f"answered {r['answered_rate']:.1%}  refused {r['abstained_rate']:.1%}")
+    for name in ("balanced", "min_answered_0.97"):
+        c = r[name]
+        typer.echo(f"{name:18} threshold {c['threshold']:7.3f}  answered {c['answered_rate']:.1%}  "
+                   f"refused off-topic {c['abstained_rate']:.1%}")
 
 
 if __name__ == "__main__":

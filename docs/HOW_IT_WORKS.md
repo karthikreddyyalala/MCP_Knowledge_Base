@@ -8,7 +8,7 @@ For *why* each decision was made and what it measured, see [BUILD_LOG.md](BUILD_
 
 ## 1. The one-paragraph version
 
-You point `kb index` at a folder of markdown files. It cuts each file into small pieces (chunks), and stores every chunk twice: once as an **embedding** (a list of 384 numbers that captures meaning) in ChromaDB, and once as **words** in a BM25 keyword index (SQLite). When Claude asks a question through MCP, `kb serve` finds the best chunks with both methods, merges the two lists (**RRF**), optionally re-scores the top ones with a slower, more accurate model (**reranker**), and returns them with exact `file:line` citations. If even the best chunk is a poor match, it says "No relevant results in your docs." instead of guessing. Everything runs on your machine; only the returned chunks enter the conversation.
+You point `kb index` at a folder of markdown files. It cuts each file into small pieces (chunks), and stores every chunk twice: once as an **embedding** (a list of 384 numbers that captures meaning) in ChromaDB, and once as **words** in a BM25 keyword index (SQLite). When Claude asks a question through MCP, `kb serve` finds the best chunks with both methods, merges the two lists (**RRF**), optionally re-scores the top 20 with a slower, more accurate model (**reranker**), and returns them with exact `file:line` citations. If even the best chunk is a poor match, it says "No relevant results in your docs." instead of guessing. Everything runs on your machine; only the returned chunks enter the conversation.
 
 ---
 
@@ -71,9 +71,9 @@ server.search_docs  ->  searcher.search(query, settings)          src/mcp_kb/sea
        dense: Chroma nearest 50 by embedding
        bm25:  FTS5 top 50; each query word quoted and OR-joined (punctuation can't break it)
        hybrid (default): rrf([dense ids, bm25 ids])
-  2. _rerank (if settings.rerank)
-       cross-encoder scores (query, chunk) for the top rerank_candidates; sort by score
-  3. abstain (if settings.min_score is set)
+  2. _rerank (default on)
+       cross-encoder scores (query, chunk) for the top 20 (rerank_candidates); sort by score
+  3. abstain (default min_score -6.57, from results/abstention.json)
        best score < min_score  ->  []  ->  "No relevant results in your docs."
   4. format top_k (5):  "[source: ops/runbook.md:L8-L14]\n<chunk text>"
 ```
@@ -130,7 +130,7 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 | `test_metrics.py` | Metric values computed by hand. |
 | `test_abstain.py` | Threshold selection. |
 | `test_beir.py` | The benchmark runner on a tiny fake dataset (no network). |
-| `test_retrieval_quality.py` | Regression gate: 20 questions on `example-docs`, per search mode. |
+| `test_retrieval_quality.py` | Regression gate on `example-docs`: 17 answerable questions per search mode, and with shipped defaults every answerable question is answered and 5 unanswerable ones are refused. |
 | `test_server.py` | Starts `kb serve` and talks real MCP to it, like Claude does. |
 
 ### Other files

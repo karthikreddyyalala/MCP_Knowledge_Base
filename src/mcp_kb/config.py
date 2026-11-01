@@ -13,7 +13,9 @@ class Settings:
     context_prefix: bool = True  # prepend "path > H1 > H2" to each chunk
     search_mode: str = "hybrid"  # "dense", "bm25" or "hybrid"; hybrid won on BEIR (see README)
     candidates: int = 50  # per-retriever candidates before fusion
-    rerank: bool = False
+    rerank: bool = True  # hybrid + rerank top 20 won on BEIR (see README)
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    rerank_candidates: int = 50  # how many fused candidates the cross-encoder scores
-    min_score: float | None = None  # reranker score below which search answers "not found"
+    rerank_candidates: int = 20  # 20 tied or beat 50 on BEIR at about half the latency
+    # Below this reranker score, search answers "not found". Calibrated in results/abstention.json:
+    # answers 97% of answerable BEIR queries and refuses 70% of off-topic ones. None = never refuse.
+    min_score: float | None = -6.57

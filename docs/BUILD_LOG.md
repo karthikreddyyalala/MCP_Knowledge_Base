@@ -97,7 +97,7 @@ BM25 matches published BEIR BM25 (~0.665 / ~0.325 / ~0.236), so the keyword side
 
 **Decision:** hybrid is the default: significant wins on 2 of 3, no significant loss on the third. Fusion weights were *not* tuned on the test set (that would be overfitting the benchmark).
 
-**Good example to remember:** BM25 alone missed "what Slack channels should I join?" on the example docs because the runbook mentions Slack. Embeddings understand it's an onboarding question. That's why hybrid exists. The regression gate now has a baseline per mode.
+**Correction found in phase 4:** at the time I said BM25 "missed" the example question "what Slack channels should I join?" because the runbook mentions Slack. In fact the example docs never answer that question; it was a bad entry in v1's answer key, and dense only "passed" because onboarding.md was the closest file. Phase 4's "not found" threshold exposed it. With the answer key fixed, BM25 gets 17/17. The real lesson: a test set can be wrong, and a refusal mechanism is one way to find out.
 
 **Interview answers**
 1. *BM25's parts?* Term frequency (word appears often in the chunk), IDF (rare words count more), length normalization (long chunks don't win by size).
@@ -114,7 +114,30 @@ BM25 matches published BEIR BM25 (~0.665 / ~0.325 / ~0.236), so the keyword side
 
 **Before building:** relevant pair scored −0.2, irrelevant −11 (raw logits): a clear gap for a threshold. 50 pairs took ~430 ms on the Mac GPU, so reranking 20 vs 50 is an ablation row.
 
-**Measured:** _filled in when the benchmark run finishes._
+**Measured (nDCG@10; p vs plain hybrid):**
+
+| | SciFact | NFCorpus | FiQA | p95 |
+|---|---|---|---|---|
+| hybrid | 0.711 | 0.349 | 0.346 | 31–124 ms |
+| hybrid + rerank 50 | 0.709 (p=0.89) | 0.360 (p=0.06) | **0.370 (p=0.005)** | 173–280 ms |
+| **hybrid + rerank 20 (default)** | 0.720 (p=0.44) | **0.364 (p=0.002)** | **0.367 (p=0.003)** | 64–325 ms |
+| dense + rerank 50 | 0.704 | 0.339 | 0.372 | |
+
+Against the original dense search, the default is +0.061 (SciFact), +0.044 (NFCorpus), both p < 0.001, and +0.011 on FiQA (p = 0.26, level). The reranker fixed FiQA, where plain hybrid had dipped. Rerank 20 beat rerank 50 on SciFact (p = 0.018) at half the cost; my guess is that more candidates give the reranker more chances to promote a wrong chunk it happens to like.
+
+**Abstention (cross-dataset calibration, 900 answerable + 900 off-topic queries):**
+
+| Rule | Threshold | Answered | Refused off-topic |
+|---|---|---|---|
+| Balanced accuracy | −3.60 | 91.9% | 83.0% |
+| **Answer >= 97% (default)** | **−6.57** | **97.0%** | **69.6%** |
+
+**Decision:** "refuse only when confident". A wrong refusal loses a real answer; a weak chunk is something Claude can judge itself.
+
+**Mistakes and fixes along the way:**
+- The first calibration used rerank 50, but the default became rerank 20, so it was rerun on the shipped setup.
+- The regression gate failed with the new threshold: 3 of 20 "answerable" example questions were refused. Reading `onboarding.md` showed they are not answerable at all (no Slack, code review or wiki info). v1's answer key was wrong. They are now unanswerable test cases, and the gate checks both that real questions are answered and that unanswerable ones are refused.
+- Near-miss limitation confirmed: "how do I roll back the database?" scores −4.59 and gets through. That is phase 6's job.
 
 **Interview answers**
 1. *Bi-encoder vs cross-encoder?* A bi-encoder embeds query and chunk separately, so chunk vectors are precomputed: fast but approximate. A cross-encoder reads them together, so every word of the query can attend to every word of the chunk: accurate but must run per pair at query time.
@@ -128,6 +151,7 @@ BM25 matches published BEIR BM25 (~0.665 / ~0.325 / ~0.236), so the keyword side
 
 | # | Phase | Status |
 |---|---|---|
+| 4 | Rerank + not found | done |
 | 5 | Incremental sync (re-index only changed files) and sync at server start | not started |
 | 6 | `kb eval`: generate test questions from your own docs with a local LLM (Ollama), including unanswerable ones; recommend a setup and threshold | not started (needs Ollama installed) |
 | 7 | `kb bench` adapters for qmd and knowledge-rag; comparison table with wins and losses | not started |

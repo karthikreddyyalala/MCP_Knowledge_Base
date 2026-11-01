@@ -197,7 +197,7 @@ def write_summary(results_dir: Path) -> None:
         "10,000 permutations). p >= 0.05 means the difference may be noise.\n\n" + "\n".join(rows) + "\n")
 
 
-def calibrate_abstention(work_dir: Path, setup: str = "hybrid-rerank", per_side: int = 300, seed: int = 0) -> dict:
+def calibrate_abstention(work_dir: Path, setup: str = "hybrid-rerank20", per_side: int = 300, seed: int = 0) -> dict:
     """Pick the "not found" threshold using cross-dataset negatives.
 
     BEIR has no unanswerable questions, so for each dataset: its own queries are answerable
@@ -219,7 +219,10 @@ def calibrate_abstention(work_dir: Path, setup: str = "hybrid-rerank", per_side:
         pos += p
         neg += n
         per_dataset[name] = {"answerable": len(p), "unanswerable": len(n)}
-    result = calibrate(pos, neg)
-    return {"setup": setup, "method": "cross-dataset negatives", **{k: round(v, 3) for k, v in result.items()},
+    r3 = lambda d: {k: round(v, 3) for k, v in d.items()}  # noqa: E731
+    return {"setup": setup, "method": "cross-dataset negatives",
+            "balanced": r3(calibrate(pos, neg)),
+            "min_answered_0.97": r3(calibrate(pos, neg, min_answered=0.97)),
             "n_answerable": len(pos), "n_unanswerable": len(neg), "per_dataset": per_dataset,
-            "date": datetime.date.today().isoformat()}
+            "date": datetime.date.today().isoformat(),
+            "scores": {"answerable": [round(x, 3) for x in pos], "unanswerable": [round(x, 3) for x in neg]}}

@@ -33,3 +33,13 @@ async def test_empty_index_tells_user_what_to_run(tmp_path):
             await session.initialize()
             result = await session.call_tool("search_docs", {"query": "anything"})
             assert "kb index" in result.content[0].text
+
+
+async def test_off_topic_question_gets_not_found(tmp_path):
+    db = tmp_path / "chroma"
+    build_index(Settings(docs_path=EXAMPLE_DOCS, db_path=db))
+    async with stdio_client(_params(db)) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("search_docs", {"query": "what is the best pizza in Naples"})
+            assert result.content[0].text == "No relevant results in your docs."
