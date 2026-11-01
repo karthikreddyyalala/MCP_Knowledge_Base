@@ -25,7 +25,7 @@ uv venv && uv pip install -e .
 .venv/bin/kb search "when does my login token stop working"  # exactly what Claude will see
 ```
 
-The models (~175 MB) download on first use; after that nothing touches the network.
+The models (~175 MB) download on first use; after that nothing touches the network. Once published to PyPI as `citekb`, `uvx citekb index ./docs` will work without cloning.
 
 ## Connect to Claude
 

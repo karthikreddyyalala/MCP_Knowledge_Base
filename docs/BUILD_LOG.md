@@ -228,7 +228,9 @@ SciFact pairwise: qmd vs kb +0.008 (p = 0.62), knowledge-rag vs kb -0.003 (p = 0
 - **Landing page** (`docs/index.html`, deployed by Vercel from `main`) still claimed "MRR 0.585 on MS MARCO, 3.5x BM25"; replaced with the BEIR results and comparison.
 - **Launch drafts:** `docs/launch/blog-post.md` and `docs/launch/posts.md` (Hacker News, LinkedIn, r/LocalLLaMA).
 
-**Needs you:** pick a PyPI name (`mcp-knowledge-base` and `kb-mcp` are taken), choose a license, set up the PyPI trusted publisher, review the site in a browser, merge to `main`, post the launch, update the portfolio card.
+**Decided (2026-11-01):** PyPI name `citekb` (both `kb` and `citekb` commands), MIT license.
+
+**Needs you:** set up the PyPI trusted publisher, review the site in a browser, merge to `main`, post the launch, update the portfolio card.
 
 ---
 

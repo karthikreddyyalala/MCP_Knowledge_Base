@@ -1,12 +1,14 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-knowledge-base"  # taken on PyPI: rename before publishing (see docs/START_HERE.md)
+name = "citekb"
 version = "0.2.0"
 description = "Local MCP search over your markdown docs for Claude: hybrid retrieval, reranking, cited answers, and an evaluator for your own docs."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Karthik Reddy" }]
 keywords = ["mcp", "claude", "rag", "retrieval", "bm25", "hybrid-search", "reranking", "beir", "evaluation"]
@@ -31,6 +33,7 @@ Results = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base/blob/main/re
 
 [project.scripts]
 kb = "mcp_kb.cli:app"
+citekb = "mcp_kb.cli:app"  # same command; lets `uvx citekb ...` work
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]

@@ -158,8 +158,8 @@ Then open [BUILD_LOG.md](BUILD_LOG.md#remaining-phases-from-the-spec) for the ne
 
 | Item | Who |
 |---|---|
-| Pick a PyPI name (`mcp-knowledge-base` and `kb-mcp` are taken; free: `citekb`, `kb-eval`, `measured-kb`, `localkb-mcp`, ...) | **You** |
-| Choose a license (MIT is the usual choice for portfolio projects) | **You** |
+| ~~Pick a PyPI name~~ | Done: `citekb` (commands `kb` and `citekb`) |
+| ~~Choose a license~~ | Done: MIT |
 | Create a PyPI account, add a trusted publisher for `release.yml` (steps at the top of that file), then `git tag v0.2.0 && git push --tags` | **You** |
 | Look at the updated site (`docs/index.html`) in a browser before merging | **You** |
 | Post the blog: drafts in `docs/launch/` (blog post, HN, LinkedIn, Reddit) | **You** |
