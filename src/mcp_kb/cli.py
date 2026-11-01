@@ -33,8 +33,8 @@ def search(query: str, db: Path = DbOption, top_k: int = typer.Option(5, "--top-
     results = searcher.search(query, settings)
     if not results:
         typer.echo(server.NOT_FOUND if searcher.list_sources(settings) else server.NOT_INDEXED)
-    for r in results:
-        typer.echo(f"{r['citation']}\n{r['text']}\n")
+    else:
+        typer.echo(server.format_results(results, settings))
 
 
 @app.command()

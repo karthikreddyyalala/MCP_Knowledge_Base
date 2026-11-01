@@ -57,7 +57,7 @@ def evaluate(settings: Settings, gold: list[dict]) -> dict:
     top = lambda q: (search(q, s) or [{"score": float("-inf")}])[0]["score"]  # noqa: E731
     pos, neg = [top(g["question"]) for g in answerable], [top(g["question"]) for g in unanswerable]
     abstention = {"n_answerable": len(pos), "n_unanswerable": len(neg)}
-    shipped = Settings().min_score
+    shipped = Settings().warn_below
     abstention["shipped_threshold"] = {
         "threshold": shipped,
         "answered_rate": round(mean([p >= shipped for p in pos]), 3),
@@ -93,16 +93,18 @@ def format_report(r: dict) -> str:
         p = "default" if m["p_vs_default"] is None else f"{m['p_vs_default']:.3f}"
         lines.append(f"{name:<17}{m['hit@5']:>7.3f}{m['mrr@5']:>7.3f}{m['p50_ms']:>8}{p:>14}")
     a = r["abstention"]
-    lines += ["", "Not-found threshold (reranker top score):"]
+    lines += ["", "Confidence threshold (reranker top score; below it results are flagged or refused):"]
     sh = a["shipped_threshold"]
     refused = "n/a" if sh["abstained_rate"] is None else f"{sh['abstained_rate']:.0%}"
-    lines.append(f"  {'shipped default':<17} {sh['threshold']:>7.2f}: answers {sh['answered_rate']:.0%}, refuses {refused}")
+    lines.append(f"  {'shipped warning':<17} {sh['threshold']:>7.2f}: confident on {sh['answered_rate']:.0%}, flags {refused}")
     for rule in ("balanced", "min_answered_0.97"):
         if rule in a:
             c = a[rule]
             lines.append(f"  {rule:<17} {c['threshold']:>7.2f}: answers {c['answered_rate']:.0%}, "
                          f"refuses {c['abstained_rate']:.0%}")
     rec = r["recommendation"]
+    if "min_answered_0.97" in a:
+        lines.append("  --save-threshold turns the min_answered_0.97 value into a hard \"not found\" for this index.")
     lines += ["", f"Recommendation: {rec['setup']}. {rec['reason'][0].upper() + rec['reason'][1:]}."]
     if "review_pass_rate" in r:
         lines.append(f"Human review: {r['review_pass_rate']:.0%} of sampled questions judged fair.")

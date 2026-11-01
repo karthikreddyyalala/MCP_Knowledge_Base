@@ -1,0 +1,40 @@
+name: Release
+
+# Publishes to PyPI when a version tag is pushed (git tag v0.2.0 && git push --tags).
+# Uses PyPI trusted publishing: no API token is stored. One-time setup on pypi.org:
+#   Account -> Publishing -> Add a pending publisher -> GitHub, this repo, workflow "release.yml",
+#   environment "pypi".
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache Hugging Face models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      - run: pip install -e ".[dev]"
+      - run: pytest tests -q
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build && python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1

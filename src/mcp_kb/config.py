@@ -18,9 +18,13 @@ class Settings:
     rerank: bool = True  # hybrid + rerank top 20 won on BEIR (see README)
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rerank_candidates: int = 20  # 20 tied or beat 50 on BEIR at about half the latency
-    # Below this reranker score, search answers "not found". Calibrated in results/abstention.json:
-    # answers 97% of answerable BEIR queries and refuses 70% of off-topic ones. None = never refuse.
-    min_score: float | None = -6.57
+    # Below this reranker score, results are returned with a low-confidence warning. Calibrated on
+    # BEIR (results/abstention.json: 97% of answerable queries score above it). It is a warning, not
+    # a refusal, because on short engineering docs correct answers can score below it.
+    warn_below: float | None = -6.57
+    # Hard refusal ("not found") below this score. Off by default; `kb eval --save-threshold`
+    # sets it from your own docs (see config.with_calibration).
+    min_score: float | None = None
 
 
 CALIBRATION_FILE = "calibration.json"

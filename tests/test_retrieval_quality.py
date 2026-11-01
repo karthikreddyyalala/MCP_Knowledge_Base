@@ -63,10 +63,22 @@ def test_example_docs_retrieval_does_not_regress(tmp_path, mode):
     assert mrr >= min_mrr, f"{mode}: MRR dropped to {mrr:.3f}"
 
 
-def test_default_settings_answer_real_questions_and_refuse_the_rest(tmp_path):
+# Conversational paraphrases with no shared keywords. The BEIR-calibrated threshold used to refuse
+# these even though the top result was right; they must never be hidden by default.
+PARAPHRASES = [
+    ("undo a bad deployment", "deployment-runbook.md"),
+    ("revert a broken deploy", "deployment-runbook.md"),
+    ("how do I undo a deploy that broke production", "deployment-runbook.md"),
+]
+
+
+def test_default_settings_never_hide_answers_and_flag_unanswerable(tmp_path):
     settings = Settings(docs_path=EXAMPLE_DOCS, db_path=tmp_path / "chroma")  # shipped defaults
     build_index(settings)
-    refused = [q for q, _ in GOLD if not search(q, settings)]
-    assert not refused, f"refused answerable questions: {refused}"
-    answered = [q for q in UNANSWERABLE if search(q, settings)]
-    assert not answered, f"answered unanswerable questions: {answered}"
+    for question, expected in GOLD + PARAPHRASES:
+        results = search(question, settings)
+        assert results and results[0]["source"] == expected, f"{question!r} -> {results[:1]}"
+    weak = [q for q, _ in GOLD if search(q, settings)[0]["score"] < settings.warn_below]
+    assert not weak, f"answerable questions flagged low-confidence: {weak}"
+    confident = [q for q in UNANSWERABLE if search(q, settings)[0]["score"] >= settings.warn_below]
+    assert not confident, f"unanswerable questions not flagged: {confident}"
