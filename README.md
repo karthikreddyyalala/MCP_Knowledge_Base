@@ -144,4 +144,18 @@ Covers chunking, index building, citations, relative-path sources, the empty-ind
 
 ## Benchmarks
 
-v2 is in progress: BEIR evaluation (SciFact, NFCorpus, FiQA) with a dense / BM25 / hybrid / hybrid + rerank ablation, run identically against other local retrieval tools. Results will be published here with the command to reproduce them.
+Measured on [BEIR](https://github.com/beir-cellar/beir) test sets. Each document is written to a markdown file and goes through the real `kb index` and `search` code, so these numbers measure the product, not a separate script.
+
+| Dataset | Setup | nDCG@10 | Recall@10 | MRR@10 | p50 latency |
+|---|---|---|---|---|---|
+| SciFact (5.2k docs, 300 queries) | v1 dense | 0.652 | 0.782 | 0.614 | 7 ms |
+| NFCorpus (3.6k docs, 323 queries) | v1 dense | 0.309 | 0.150 | 0.496 | 7 ms |
+| FiQA (57.6k docs, 648 queries) | v1 dense | 0.362 | 0.432 | 0.436 | 7 ms |
+
+These match published `all-MiniLM-L6-v2` results within about one point, which is the sanity check that the pipeline is sound. This is the v1 baseline; hybrid search and reranking rows are added as they land. Full results: [results/summary.md](results/summary.md).
+
+Reproduce any row:
+
+```bash
+.venv/bin/kb bench --dataset scifact   # also nfcorpus, fiqa
+```
