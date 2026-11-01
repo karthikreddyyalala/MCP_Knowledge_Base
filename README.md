@@ -26,6 +26,8 @@ Two steps:
 
 **Serve** - `kb serve` runs in the background and registers two tools with Claude Desktop over stdio: `search_docs` and `list_docs`. When you ask Claude a question, it calls `search_docs`, gets back the top 5 relevant chunks with line citations, and answers from there.
 
+For the full walkthrough (every concept, file and command) see [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md); for why each decision was made and what it measured, see [docs/BUILD_LOG.md](docs/BUILD_LOG.md).
+
 The docs never leave your machine. Only the retrieved snippet (one paragraph, basically) enters the conversation.
 
 ---
