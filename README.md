@@ -22,7 +22,7 @@ You could upload them manually every conversation. But that sends your internal 
 
 Two steps:
 
-**Index** - run `kb index` once. It reads your `.md` files, splits them into 400-token chunks (50-token overlap so nothing gets cut mid-sentence), embeds each chunk with `all-MiniLM-L6-v2`, and saves everything to ChromaDB on your local disk. The model downloads once from HuggingFace, then all inference is offline.
+**Index** - run `kb index` once. It reads your `.md` files, splits them into chunks of at most 256 tokens (what the embedding model can read), prefixes each with its `path > heading`, embeds it with `all-MiniLM-L6-v2` into ChromaDB and adds it to a BM25 keyword index (SQLite FTS5), all on your local disk. The model downloads once from HuggingFace, then all inference is offline.
 
 **Serve** - `kb serve` runs in the background and registers two tools with Claude Desktop over stdio: `search_docs` and `list_docs`. When you ask Claude a question, it calls `search_docs`, gets back the top 5 relevant chunks with line citations, and answers from there.
 
@@ -113,7 +113,9 @@ Used Phoenix over RAGAS because this project is a retriever, not a generator. RA
 
 **all-MiniLM-L6-v2** - 80MB, downloads once, runs offline forever. Strong enough for English prose docs.
 
-**400-token chunks, 50-token overlap** - big enough to capture a full thought, small enough to retrieve precisely. Overlap means nothing important gets split across a boundary.
+**256-token chunks, 32-token overlap** - the embedding model reads at most 256 tokens and silently drops the rest, so chunks are sized in real tokens with its own tokenizer. Overlap means a sentence on a boundary is still found.
+
+**Hybrid search, fused by rank** - embeddings catch paraphrases, BM25 catches exact names and error codes. Reciprocal Rank Fusion merges them by rank position because their scores are on unrelated scales. See the benchmark table for what each piece is worth.
 
 **Line citations not just filenames** - filenames tell you which doc. Line numbers tell you exactly where, so you can verify and notice when docs go stale.
 
@@ -146,22 +148,27 @@ Covers chunking, index building, citations, relative-path sources, the empty-ind
 
 Measured on [BEIR](https://github.com/beir-cellar/beir) test sets. Each document is written to a markdown file and goes through the real `kb index` and `search` code, so these numbers measure the product, not a separate script.
 
-nDCG@10 (higher is better). `p` is a paired randomization test against the row above it; below 0.05 means the difference is unlikely to be noise.
+nDCG@10, higher is better. Each change is tested against the row it builds on with a paired randomization test over per-query scores; **bold** means p < 0.05, the rest may be noise.
 
-| Setup | SciFact | NFCorpus | FiQA |
-|---|---|---|---|
-| v1: 400-word chunks, dense | 0.652 | 0.309 | 0.362 |
-| 256-token chunks + `path > heading` prefix | 0.659 (p=0.46) | **0.323 (p=0.047)** | 0.354 (p=0.25) |
-| same, prefix removed | 0.638 (p=0.07) | 0.317 (p=0.29) | 0.366 (p=0.07) |
+| Setup | SciFact | NFCorpus | FiQA | p95 latency |
+|---|---|---|---|---|
+| v1: 400-word chunks, dense | 0.652 | 0.309 | 0.362 | 9 ms |
+| 256-token chunks + `path > heading` prefix, dense | 0.659 | 0.321 | 0.356 | 8 ms |
+| BM25 alone (SQLite FTS5) | 0.685 | 0.323 | 0.241 | 123 ms |
+| **Hybrid: dense + BM25, RRF fusion (default)** | **0.711** (+0.051) | **0.349** (+0.028) | 0.346 (−0.010) | 124 ms |
 
 What this shows:
-- **Token-sized chunks are a correctness fix more than a score boost.** v1 chunks were ~520 tokens and the model reads 256, so half of each chunk was never searchable. BEIR documents are mostly short, so the gain is small here (significant only on NFCorpus); long documents like runbooks lose far more text under v1.
-- **The prefix helps when it carries meaning.** It repeats the title on every chunk, which helps SciFact. FiQA documents have no titles, so the prefix is just a numeric file name, and it slightly hurts. On real docs the path (`ops/deployment-runbook`) is meaningful, so the prefix stays on by default.
+- **Hybrid is the default** because it is a significant win on SciFact and NFCorpus (p < 0.001 vs dense) and not a significant loss on FiQA (p = 0.21).
+- **FiQA is the honest exception.** It is paraphrased finance questions with little word overlap, so BM25 is weak there (0.241) and equal-weight fusion can't help. Fusion weights were not tuned on the test set, since that would overfit the benchmark. Reranking (next) is the principled fix.
+- **Sanity checks:** dense matches published `all-MiniLM-L6-v2` results and BM25 matches published BM25 baselines (SciFact ~0.665, NFCorpus ~0.325, FiQA ~0.236) within about a point.
+- **Token-sized chunks are a correctness fix more than a score boost.** v1 chunks were ~520 tokens and the model reads 256, so half of each chunk was never searchable. BEIR documents are short, so the effect is small here; long documents like runbooks lose far more text under v1.
+- **The context prefix** helps where it carries meaning (paper titles on SciFact) and slightly hurts where it is a bare numeric file name (FiQA, p = 0.048). Real file paths are meaningful, so it stays on.
+- Dense scores vary by about ±0.002 between index rebuilds because the vector index is approximate (HNSW).
 
-v1 baseline matches published `all-MiniLM-L6-v2` results within about a point, which confirms the pipeline. All results with latency: [results/summary.md](results/summary.md). The v1 row was produced at commit `1016550`.
+Full table with Recall@10, MRR@10, latency and p-values: [results/summary.md](results/summary.md). The v1 row was produced at commit `1016550`.
 
 Reproduce any row:
 
 ```bash
-.venv/bin/kb bench --dataset scifact --setup dense   # datasets: scifact, nfcorpus, fiqa
+.venv/bin/kb bench --dataset scifact --setup hybrid   # setups: dense, bm25, hybrid; datasets: scifact, nfcorpus, fiqa
 ```
