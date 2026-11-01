@@ -1,7 +1,13 @@
-"""MCP server: exposes search_docs and list_docs to Claude over stdio."""
+"""MCP server: exposes search_docs and list_docs to Claude over stdio.
+
+stdout carries MCP messages, so anything for humans goes to stderr.
+"""
+import sys
+
 from mcp.server.mcpserver import MCPServer
 
 from mcp_kb.config import Settings
+from mcp_kb.indexer import pending_changes, read_manifest, sync
 from mcp_kb.searcher import list_sources, search, warmup
 from mcp_kb.tracing import setup_tracing
 
@@ -30,12 +36,20 @@ def build_server(settings: Settings) -> MCPServer:
         sources = list_sources(settings)
         if not sources:
             return NOT_INDEXED
-        return "Indexed documents:\n" + "\n".join(f"- {s}" for s in sources)
+        manifest = read_manifest(settings) or {}
+        lines = [f"Indexed documents ({len(sources)} files, last indexed {manifest.get('indexed_at', 'unknown')}):"]
+        lines += [f"- {s}" for s in sources]
+        pending = pending_changes(settings)
+        if pending:
+            lines.append(f"\n{pending} file(s) changed since then. Restart the server or run: kb index <path>")
+        return "\n".join(lines)
 
     return server
 
 
 def run(settings: Settings) -> None:
     setup_tracing()
+    if settings.docs_path is not None:
+        print(f"kb: syncing {settings.docs_path}: {sync(settings).summary()}", file=sys.stderr)
     warmup(settings)  # pay the model load at startup, not on the user's first question
     build_server(settings).run("stdio")

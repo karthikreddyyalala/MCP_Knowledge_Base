@@ -43,3 +43,20 @@ async def test_off_topic_question_gets_not_found(tmp_path):
             await session.initialize()
             result = await session.call_tool("search_docs", {"query": "what is the best pizza in Naples"})
             assert result.content[0].text == "No relevant results in your docs."
+
+
+async def test_server_with_docs_picks_up_edits_at_startup(tmp_path):
+    docs, db = tmp_path / "docs", tmp_path / "chroma"
+    docs.mkdir()
+    (docs / "a.md").write_text("# Deploys\n\nRun kubectl apply to ship a release.\n")
+    build_index(Settings(docs_path=docs, db_path=db))
+    (docs / "a.md").write_text("# Deploys\n\nShip releases with the zebracorn pipeline.\n")  # edit after indexing
+    params = StdioServerParameters(command=sys.executable,
+                                   args=["-m", "mcp_kb.cli", "serve", "--db", str(db), "--docs", str(docs)])
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("search_docs", {"query": "how do I ship a release with zebracorn"})
+            assert "zebracorn" in result.content[0].text
+            listing = await session.call_tool("list_docs", {})
+            assert "a.md" in listing.content[0].text and "changed since" not in listing.content[0].text

@@ -36,20 +36,28 @@ You point `kb index` at a folder of markdown files. It cuts each file into small
 | **MRR@10** | How high the *first* correct hit is (1/rank). | `mrr_at_k` |
 | **Ablation** | Turn one piece on or off and measure the change, so each piece's value is known. | `SETUPS` in `beir.py` |
 | **Paired randomization test** | Is a score difference real or luck? Randomly flip the sign of each query's difference 10,000 times; if a gap as big as ours shows up often, it's noise. p < 0.05 = probably real. | [stats.py](../src/mcp_kb/evals/stats.py) |
+| **Incremental sync / manifest** | Remember each file's content hash and chunk ids, so re-indexing only touches files that changed. | [indexer.py](../src/mcp_kb/indexer.py) |
 | **Regression gate** | A test that fails if search quality on the example docs drops. | [test_retrieval_quality.py](../tests/test_retrieval_quality.py) |
 
 ---
 
 ## 3. Data flow
 
-### Indexing: `kb index ./docs`
+### Indexing: `kb index ./docs` (incremental)
 
 ```
-docs/**/*.md
-  │  indexer.build_index                       src/mcp_kb/indexer.py
+docs/**/*.md, *.txt
+  │  indexer.sync                              src/mcp_kb/indexer.py
   ▼
-for each file:
-  source = path relative to docs root          "ops/runbook.md"  (not just "runbook.md")
+scan: source = path relative to docs root, sha256 of the bytes; skip files that aren't UTF-8
+compare with manifest.json (config + per-file sha256 + chunk ids)
+  config changed or no manifest  -> full rebuild
+  file removed or sha changed    -> delete its chunk ids from Chroma and BM25
+  file new or sha changed        -> chunk it (below), upsert
+  sha unchanged                  -> skip (no embedding work)
+write manifest.json LAST (an interrupted sync is repaired by the next one)
+
+for each new/changed file:
   chunking.chunk_markdown(text, source, tokenizer)
      1. split at #, ##, ### headings; keep a heading trail  [Runbook, Rollback]
      2. prefix = "ops/runbook > Runbook > Rollback\n\n"
@@ -59,7 +67,8 @@ for each file:
      6. slice the ORIGINAL text by offsets; map offsets to line numbers
   ▼
 chunks: {text, start_line, end_line} + source
-  ├──► ChromaDB collection "kb_docs"  (embeds each chunk with all-MiniLM-L6-v2, in batches)
+  ids = <sha1(path)[:12]>-<n>             (stable per file, so deletes are exact)
+  ├──► ChromaDB collection "kb_docs"  (embeds each chunk with all-MiniLM-L6-v2, upsert in batches)
   └──► bm25.sqlite FTS5 table          (same chunk ids, text, source, lines)
 ```
 
@@ -101,11 +110,11 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 | [config.py](../src/mcp_kb/config.py) | `Settings`: every knob in one dataclass (model, chunk size, search mode, rerank, threshold). | The defaults and their comments. |
 | [chunking.py](../src/mcp_kb/chunking.py) | Heading-aware, token-budgeted chunks with exact line ranges. | `chunk_markdown`: the window loop and `word_start`. |
 | [models.py](../src/mcp_kb/models.py) | Loads the tokenizer and reranker once per process (`lru_cache`). | Two short functions. |
-| [indexer.py](../src/mcp_kb/indexer.py) | Walks the docs folder, chunks, writes ChromaDB + BM25. | `build_index`. |
+| [indexer.py](../src/mcp_kb/indexer.py) | Incremental sync: compares the docs folder with `manifest.json` and re-indexes only changed files into ChromaDB + BM25. | The module docstring, then `sync`. |
 | [bm25.py](../src/mcp_kb/bm25.py) | FTS5 keyword index: `write` and `query`. | The comment on quoting in `query`. |
 | [fusion.py](../src/mcp_kb/fusion.py) | RRF in 6 lines. | The docstring. |
 | [searcher.py](../src/mcp_kb/searcher.py) | The search pipeline: retrieve, rerank, abstain, format. | `search` docstring, then `_retrieve`. |
-| [server.py](../src/mcp_kb/server.py) | MCP server (SDK v2 `MCPServer`) with `search_docs` and `list_docs`; warms models at start. | `build_server`. |
+| [server.py](../src/mcp_kb/server.py) | MCP server (SDK v2 `MCPServer`) with `search_docs` and `list_docs`; syncs `--docs` and warms models at start. Logs go to stderr because stdout carries MCP. | `build_server`, `run`. |
 | [cli.py](../src/mcp_kb/cli.py) | The `kb` command: `index`, `search`, `serve`, `bench`, `calibrate`. | `--help` output. |
 | [tracing.py](../src/mcp_kb/tracing.py) | Optional Arize Phoenix spans for each search. Off unless `PHOENIX_ENABLED=1`. | Skip until needed. |
 
@@ -124,6 +133,7 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 |---|---|
 | `test_chunking.py` | 256-token limit, exact lines, breadcrumbs, overlap, no split words. |
 | `test_indexer.py` | Index builds, relative-path sources. |
+| `test_sync.py` | Incremental sync: unchanged files skipped, edits replace old text, deletes disappear, same-content rewrite is unchanged, non-UTF-8 skipped, config change rebuilds, `.txt` indexed. |
 | `test_searcher.py` | Citations, empty index, bm25/hybrid modes, rerank order, abstention. |
 | `test_bm25.py` | Exact identifiers, stemming, hostile punctuation, empty cases. |
 | `test_stats.py` | Significance test and RRF math. |
@@ -131,7 +141,7 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 | `test_abstain.py` | Threshold selection. |
 | `test_beir.py` | The benchmark runner on a tiny fake dataset (no network). |
 | `test_retrieval_quality.py` | Regression gate on `example-docs`: 17 answerable questions per search mode, and with shipped defaults every answerable question is answered and 5 unanswerable ones are refused. |
-| `test_server.py` | Starts `kb serve` and talks real MCP to it, like Claude does. |
+| `test_server.py` | Starts `kb serve` and talks real MCP to it, like Claude does; includes an edit made after indexing being picked up at startup, and an off-topic question getting "not found". |
 
 ### Other files
 
@@ -154,9 +164,10 @@ save results/scifact/hybrid.json, regenerate results/summary.md with Δ and p vs
 uv venv && uv pip install -e ".[dev]"
 
 # use it
-.venv/bin/kb index ./example-docs                      # build the index
+.venv/bin/kb index ./example-docs                      # build or update the index (only changed files)
+.venv/bin/kb index ./example-docs --full               # rebuild from scratch
 .venv/bin/kb search "how do I roll back a deployment"  # see what Claude would get
-claude mcp add kb -- $PWD/.venv/bin/kb serve           # connect to Claude Code
+claude mcp add kb -- $PWD/.venv/bin/kb serve --docs $PWD/example-docs   # connect; re-syncs at each start
 
 # test
 .venv/bin/python -m pytest tests -q

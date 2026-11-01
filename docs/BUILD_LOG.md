@@ -147,12 +147,30 @@ Against the original dense search, the default is +0.061 (SciFact), +0.044 (NFCo
 
 ---
 
+## Phase 5: incremental sync
+
+**Built:** `indexer.sync`: a `manifest.json` next to the index stores the chunking config and, per file, its SHA-256 and chunk ids. Sync deletes chunks of changed or removed files, chunks and upserts new or changed ones, and writes the manifest last. Chunk ids are `<sha1(path)>-<n>`, stable per file. Config changes force a full rebuild. `.txt` files are indexed; non-UTF-8 files are skipped and reported. `kb index` prints what changed (`--full` to rebuild). `kb serve --docs` syncs at startup, logging to stderr. `list_docs` shows file count, last indexed time and pending changes. BM25 store gained `add`/`delete`.
+
+**Verified by hand:** index twice (second run: 3 unchanged, no work), edit one file and delete another (1 changed, 1 removed, 9 -> 7 chunks), the new "Database rollback" section is found at its exact line, off-topic question says "No relevant results in your docs."
+
+**Checked that the rewrite didn't change quality:** rebuilt the SciFact index with the new code: 0.715 vs 0.720 committed. Two rebuilds differ on 1 of 300 queries, committed vs new on 3 of 300 (p = 0.25): approximate vector index noise, not a regression. README now states the noise as up to ±0.005.
+
+**Small fix found while testing:** `kb search` said "Did you run kb index?" for off-topic questions even when an index existed; it now prints the same "not found" message as the server.
+
+**Interview answers**
+1. *Why hash content instead of modification time?* mtime changes on a copy, checkout or save-without-edits, causing needless re-embedding; it can also stay the same across real changes (restored backups). A content hash changes exactly when the bytes change.
+2. *Why write the manifest last, and why upsert?* If the process dies mid-sync, the manifest still describes the old state, so the next sync redoes the work; upsert and delete-before-insert make redoing it safe.
+3. *Why does a config change force a full rebuild?* A different model or token budget changes every chunk or vector, so old and new chunks would be incomparable.
+4. *Why must the server log to stderr?* stdout is the MCP channel to Claude; a stray print there corrupts the protocol.
+
+---
+
 ## Remaining phases (from the spec)
 
 | # | Phase | Status |
 |---|---|---|
 | 4 | Rerank + not found | done |
-| 5 | Incremental sync (re-index only changed files) and sync at server start | not started |
+| 5 | Incremental sync (re-index only changed files) and sync at server start | done |
 | 6 | `kb eval`: generate test questions from your own docs with a local LLM (Ollama), including unanswerable ones; recommend a setup and threshold | not started (needs Ollama installed) |
 | 7 | `kb bench` adapters for qmd and knowledge-rag; comparison table with wins and losses | not started |
 | 8 | PyPI + `uvx`, MCP registry, README rewrite, demo GIF, blog post, portfolio update | not started |

@@ -4,10 +4,10 @@ from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunct
 from mcp_kb import bm25
 from mcp_kb.config import Settings
 from mcp_kb.fusion import rrf
+from mcp_kb.indexer import COLLECTION
 from mcp_kb.models import get_reranker
 from mcp_kb.tracing import search_span
 
-COLLECTION = "kb_docs"
 MODES = ("dense", "bm25", "hybrid")
 
 

@@ -7,18 +7,42 @@ FILENAME = "bm25.sqlite"
 WORD = re.compile(r"\w+")
 
 
-def write(db_dir: Path, rows: list[dict]) -> None:
-    """Replace the keyword index with these chunks: [{"id", "text", "source", "start_line", "end_line"}]."""
+# porter = stemming ("restoring" matches "restore"); UNINDEXED columns are stored, not searched
+SCHEMA = ("CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(text, id UNINDEXED, source UNINDEXED, "
+          "start_line UNINDEXED, end_line UNINDEXED, tokenize='porter unicode61')")
+
+
+def _connect(db_dir: Path) -> sqlite3.Connection:
     db_dir.mkdir(parents=True, exist_ok=True)
-    path = db_dir / FILENAME
-    path.unlink(missing_ok=True)
-    with sqlite3.connect(path) as con:
-        # porter = stemming ("restoring" matches "restore"); UNINDEXED columns are stored, not searched
-        con.execute("CREATE VIRTUAL TABLE chunks USING fts5(text, id UNINDEXED, source UNINDEXED, "
-                    "start_line UNINDEXED, end_line UNINDEXED, tokenize='porter unicode61')")
+    con = sqlite3.connect(db_dir / FILENAME)
+    con.execute(SCHEMA)
+    return con
+
+
+def delete(db_dir: Path, ids: list[str]) -> None:
+    """Remove chunks by id."""
+    con = _connect(db_dir)
+    with con:
+        for i in range(0, len(ids), 500):  # stay under SQLite's bound-parameter limit
+            batch = ids[i:i + 500]
+            con.execute(f"DELETE FROM chunks WHERE id IN ({','.join('?' * len(batch))})", batch)
+    con.close()
+
+
+def add(db_dir: Path, rows: list[dict]) -> None:
+    """Insert chunks: [{"id", "text", "source", "start_line", "end_line"}]. Re-adding an id replaces it."""
+    delete(db_dir, [r["id"] for r in rows])  # idempotent, so a sync interrupted halfway can simply rerun
+    con = _connect(db_dir)
+    with con:
         con.executemany("INSERT INTO chunks VALUES (?, ?, ?, ?, ?)",
                         [(r["text"], r["id"], r["source"], r["start_line"], r["end_line"]) for r in rows])
     con.close()
+
+
+def write(db_dir: Path, rows: list[dict]) -> None:
+    """Replace the whole keyword index with these chunks."""
+    (db_dir / FILENAME).unlink(missing_ok=True)
+    add(db_dir, rows)
 
 
 def query(db_dir: Path, text: str, n: int) -> list[dict]:

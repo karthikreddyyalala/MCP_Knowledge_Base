@@ -43,7 +43,7 @@ uv venv && uv pip install -e .
 .venv/bin/kb search "how do I roll back a deployment"
 ```
 
-`kb search` returns exactly what Claude will see, so you can check results before connecting anything.
+`kb search` returns exactly what Claude will see, so you can check results before connecting anything. Run `kb index` again after editing docs: it re-indexes only the files whose content changed (`--full` rebuilds everything). `.md` and `.txt` files are indexed.
 
 ---
 
@@ -52,8 +52,10 @@ uv venv && uv pip install -e .
 **Claude Code:**
 
 ```bash
-claude mcp add kb -- /absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb serve
+claude mcp add kb -- /absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb serve --docs /path/to/your/docs
 ```
+
+With `--docs`, the server re-indexes any files you added, edited or deleted each time it starts, so restarting Claude picks up your changes. Only changed files are re-embedded.
 
 **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on Mac):
 
@@ -62,7 +64,7 @@ claude mcp add kb -- /absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb serve
   "mcpServers": {
     "knowledge-base": {
       "command": "/absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb",
-      "args": ["serve"]
+      "args": ["serve", "--docs", "/path/to/your/docs"]
     }
   }
 }
@@ -171,7 +173,7 @@ What this shows:
 - **Sanity checks:** dense matches published `all-MiniLM-L6-v2` results and BM25 matches published BM25 baselines (SciFact ~0.665, NFCorpus ~0.325, FiQA ~0.236) within about a point.
 - **Token-sized chunks are a correctness fix more than a score boost.** v1 chunks were ~520 tokens and the model reads 256, so half of each chunk was never searchable. BEIR documents are short, so the effect is small here; long documents like runbooks lose far more text under v1.
 - **The context prefix** helps where it carries meaning (paper titles on SciFact) and slightly hurts where it is a bare numeric file name (FiQA, p = 0.048). Real file paths are meaningful, so it stays on.
-- Dense scores vary by about ±0.002 between index rebuilds because the vector index is approximate (HNSW).
+- Scores can move by up to about ±0.005 between index rebuilds because the vector index is approximate (HNSW): two rebuilds of SciFact differ on 1 to 3 of 300 queries (p = 0.25).
 
 Full table with Recall@10, MRR@10, latency and p-values: [results/summary.md](results/summary.md). The v1 row was produced at commit `1016550`.
 
