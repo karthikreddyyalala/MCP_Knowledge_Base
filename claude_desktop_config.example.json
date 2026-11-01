@@ -1,13 +1,8 @@
 {
   "mcpServers": {
     "knowledge-base": {
-      "command": "python3",
-      "args": ["/absolute/path/to/mcp-knowledge-base/src/server.py"],
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/mcp-knowledge-base",
-        "KB_DOCS_PATH": "/absolute/path/to/your/docs",
-        "KB_DB_PATH": "/Users/yourname/.mcp-kb/chroma"
-      }
+      "command": "/absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb",
+      "args": ["serve", "--db", "/Users/yourname/.mcp-kb/chroma"]
     }
   }
 }
