@@ -149,6 +149,13 @@ flowchart LR
 
 Every concept, file and command is explained in [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
 
+## Privacy and security
+
+- Indexing, search, reranking, `kb eval` and query expansion all run on your machine. No API keys, no telemetry; once the models are cached nothing touches the network.
+- The server talks to Claude over stdio and opens no network port. Ollama (optional) listens on `127.0.0.1` only.
+- What leaves your machine: the chunks returned for each question become part of your Claude conversation. Don't index anything you wouldn't paste into a chat.
+- Retrieved text is read by Claude, so a document containing instructions ("ignore previous instructions...") could influence it. Index only docs you trust.
+
 ## Reproduce
 
 ```bash
