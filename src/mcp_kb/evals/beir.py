@@ -43,6 +43,11 @@ SETUPS: dict[str, tuple[dict, Callable[[str, Settings], list[dict]]]] = {
     "dense-rerank": ({"search_mode": "dense", "rerank": True}, search),
     "hybrid-rerank": ({"search_mode": "hybrid", "rerank": True}, search),
     "hybrid-rerank20": ({"search_mode": "hybrid", "rerank": True, "rerank_candidates": 20}, search),
+    # optional LLM query expansion; no cache, so latency includes the LLM call
+    "hybrid-rerank20-expand": ({"search_mode": "hybrid", "rerank": True, "rerank_candidates": 20,
+                                "expand_queries": True, "expand_cache": False}, search),
+    "hybrid-rerank20-expand7b": ({"search_mode": "hybrid", "rerank": True, "rerank_candidates": 20,
+                                  "expand_queries": True, "expand_cache": False, "expand_model": "qwen2.5:7b"}, search),
 }
 BASELINE_SETUP = "dense"  # summary reports delta and p-value against this row
 INDEX_FIELDS = ("model_name", "max_tokens", "overlap_tokens", "context_prefix")

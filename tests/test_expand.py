@@ -77,3 +77,13 @@ def test_bad_llm_output_is_ignored(kb, monkeypatch):
     s = dataclasses.replace(kb, expand_queries=True, expand_cache=False)
     assert [r["source"] for r in search("cafeteria", s)] == ["food.md"]
     expand._cached_generator.cache_clear()
+
+
+def test_cli_expand_flag_turns_expansion_on(kb, fake_llm):
+    from typer.testing import CliRunner
+
+    from mcp_kb.cli import app
+
+    out = CliRunner().invoke(app, ["search", "zzqx", "--db", str(kb.db_path), "--expand", "fake-model"])
+    assert out.exit_code == 0, out.output
+    assert "food.md" in out.output and fake_llm

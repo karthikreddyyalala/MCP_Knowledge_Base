@@ -12,6 +12,13 @@ DEFAULT_DB = Path.home() / ".mcp-kb" / "chroma"
 app = typer.Typer(no_args_is_help=True, help="Local semantic search over your markdown docs, for Claude.")
 
 DbOption = typer.Option(DEFAULT_DB, "--db", envvar="KB_DB_PATH", help="Where the index is stored")
+ExpandOption = typer.Option(None, "--expand", envvar="KB_EXPAND_MODEL",
+                            help="Rewrite each question with this Ollama model first (e.g. qwen2.5:7b). "
+                                 "Adds ~1-1.5 s per search; no significant gain on BEIR (see README).")
+
+
+def _expansion(model: Optional[str]) -> dict:
+    return {"expand_queries": True, "expand_model": model} if model else {}
 
 
 @app.command()
@@ -27,9 +34,10 @@ def index(
 
 
 @app.command()
-def search(query: str, db: Path = DbOption, top_k: int = typer.Option(5, "--top-k")):
+def search(query: str, db: Path = DbOption, top_k: int = typer.Option(5, "--top-k"),
+           expand: Optional[str] = ExpandOption):
     """Search from the terminal. Same results Claude gets."""
-    settings = with_calibration(Settings(db_path=db, top_k=top_k))
+    settings = with_calibration(Settings(db_path=db, top_k=top_k, **_expansion(expand)))
     results = searcher.search(query, settings)
     if not results:
         typer.echo(server.NOT_FOUND if searcher.list_sources(settings) else server.NOT_INDEXED)
@@ -41,9 +49,10 @@ def search(query: str, db: Path = DbOption, top_k: int = typer.Option(5, "--top-
 def serve(
     db: Path = DbOption,
     docs: Optional[Path] = typer.Option(None, "--docs", envvar="KB_DOCS_PATH", help="Docs folder; changed files are re-indexed at startup"),
+    expand: Optional[str] = ExpandOption,
 ):
     """Run the MCP server over stdio. Claude starts this for you."""
-    server.run(with_calibration(Settings(docs_path=docs, db_path=db)))
+    server.run(with_calibration(Settings(docs_path=docs, db_path=db, **_expansion(expand))))
 
 
 @app.command()

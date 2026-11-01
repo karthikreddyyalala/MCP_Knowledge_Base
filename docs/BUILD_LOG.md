@@ -234,6 +234,35 @@ SciFact pairwise: qmd vs kb +0.008 (p = 0.62), knowledge-rag vs kb -0.003 (p = 0
 
 ---
 
+## Phase 9: optional LLM query expansion (closing the gap with qmd)
+
+**Why:** qmd beat kb on NFCorpus (0.383 vs 0.364, p = 0.02). Its `query` mode rewrites each question with an LLM before searching, so that was the first hypothesis to test.
+
+**Built:** `expand.py`: a local LLM returns extra keywords (searched with BM25) and a 1-2 sentence hypothetical answer (searched with embeddings; "HyDE"); all lists are fused with RRF and the reranker still scores against the original question. Falls back to plain search if Ollama is down or replies badly (two of ~2,500 calls failed during benchmarking and fell back as designed). Cached on disk next to the index. Turned on with `kb search/serve --expand <model>`. The Ollama client moved to `mcp_kb/llm.py`.
+
+**Rule set before measuring:** make it the default only if significantly better on at least two datasets and worse on none.
+
+**Measured (nDCG@10; p vs the default):**
+
+| | SciFact | NFCorpus | FiQA | p50 latency |
+|---|---|---|---|---|
+| default (no expansion) | 0.720 | 0.364 | 0.367 | ~60 ms |
+| + expansion, llama3.2:3b | 0.723 (p=0.69) | 0.368 (p=0.38) | 0.367 (p=0.95) | ~1.0 s |
+| + expansion, qwen2.5:7b | 0.717 (p=0.59) | 0.372 (p=0.10) | 0.376 (p=0.10) | ~1.5 s |
+| qmd | 0.729 | 0.383 | not run | ~5-7 s |
+
+**Decision:** no significant gain anywhere, so it stays opt-in. The 7B model trends up on NFCorpus and FiQA, but not beyond noise at this sample size, at ~25x the latency. With 7B expansion, the NFCorpus gap to qmd is no longer significant (p = 0.15) but kb is still behind (0.372 vs 0.383), so expansion explains only part of qmd's lead; its larger LLM reranker and different embedding model are the likely rest.
+
+**Bug found along the way:** checking that the retrieval rewrite left results unchanged exposed that phase 5's benchmark runs had inherited the then-default "not found" threshold (3 SciFact questions returned nothing). I had wrongly called it index noise; corrected in phase 5's entry, and benchmarks now force refusal off (tested).
+
+**Interview answers**
+1. *What is HyDE?* Embed a made-up answer instead of (or alongside) the question. Answers look like answers, so the made-up one can land closer to real passages than a short question does.
+2. *Why fuse four lists instead of replacing the query?* If the LLM's guess is wrong, the original lists still carry the right results; RRF rewards agreement.
+3. *Why rerank against the original question?* The expansion can drift; the user's own words are the ground truth for relevance.
+4. *Why fix the decision rule first?* So a small lucky bump can't be talked into a default after seeing the numbers.
+
+---
+
 ## Remaining phases (from the spec)
 
 | # | Phase | Status |

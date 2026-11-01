@@ -70,6 +70,7 @@ Every word in that diagram is explained in [HOW_IT_WORKS.md](HOW_IT_WORKS.md#2-c
 | 6 | `kb eval` | Test search on your own docs with a local AI model | Validated against human labels (below) |
 | 7 | Head-to-head | qmd and knowledge-rag on the same benchmark | Tie on SciFact; qmd ahead on NFCorpus; kb ahead of knowledge-rag; 67 ms vs 0.2 s vs 5 to 7 s |
 | 8 | Ship | Packaging, offline fix, demo GIF, README, site, launch drafts | Built; waiting on your decisions |
+| 9 | Query expansion | Optional LLM rewriting of questions (qmd's trick), `--expand` | No significant gain, ~25x slower: kept opt-in |
 
 ### Headline numbers (nDCG@10: 1.0 is perfect ranking)
 

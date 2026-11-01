@@ -37,11 +37,12 @@ You point `kb index` at a folder of markdown files. It cuts each file into small
 | **Ablation** | Turn one piece on or off and measure the change, so each piece's value is known. | `SETUPS` in `beir.py` |
 | **Paired randomization test** | Is a score difference real or luck? Randomly flip the sign of each query's difference 10,000 times; if a gap as big as ours shows up often, it's noise. p < 0.05 = probably real. | [stats.py](../src/mcp_kb/evals/stats.py) |
 | **Incremental sync / manifest** | Remember each file's content hash and chunk ids, so re-indexing only touches files that changed. | [indexer.py](../src/mcp_kb/indexer.py) |
+| **Query expansion / HyDE** (optional) | Before searching, a local LLM adds keywords with synonyms (for BM25) and writes a short made-up passage that would answer the question (for embeddings; "HyDE", Hypothetical Document Embeddings). An answer-shaped text often sits closer to the real answer than the question does. Off by default because it adds an LLM call to every search. | [expand.py](../src/mcp_kb/expand.py) |
 | **Synthetic test set (gold set)** | Test questions written by a local LLM from your own chunks, each labelled with the chunk that answers it, plus on-topic questions your docs can't answer. | [synth.py](../src/mcp_kb/evals/synth.py) |
 | **Lexical leakage** | An LLM writing a question from a passage tends to reuse its words, which makes keyword search look better than it is. Countered by the overlap filter (drop > 75% shared words) and prompt v2. | `overlap`, `ANSWERABLE_V2` |
 | **LLM as judge** | The same local model checks that a question really is answered by its chunk, and that an "unanswerable" one isn't answered by the top 3 results. | `answers` in synth.py |
 | **Spearman correlation** | Do two rankings agree? 1.0 = same order. Used to check `kb eval`'s ranking of setups against human-labelled BEIR. | [validate.py](../src/mcp_kb/evals/validate.py) |
-| **Ollama** | Runs open LLMs locally behind an HTTP API on `localhost:11434`. Only `kb eval` uses it. | [llm.py](../src/mcp_kb/evals/llm.py) |
+| **Ollama** | Runs open LLMs locally behind an HTTP API on `localhost:11434`. Used by `kb eval` and, if you turn it on, query expansion. Normal search never needs it. | [llm.py](../src/mcp_kb/llm.py) |
 | **Regression gate** | A test that fails if search quality on the example docs drops. | [test_retrieval_quality.py](../tests/test_retrieval_quality.py) |
 
 ---
@@ -82,9 +83,10 @@ chunks: {text, start_line, end_line} + source
 ```
 server.search_docs  ->  searcher.search(query, settings)          src/mcp_kb/searcher.py
   1. _retrieve
-       dense: Chroma nearest 50 by embedding
-       bm25:  FTS5 top 50; each query word quoted and OR-joined (punctuation can't break it)
-       hybrid (default): rrf([dense ids, bm25 ids])
+       optional (expand_queries): LLM adds keywords + a hypothetical answer
+       dense: Chroma nearest 50 by embedding   (+ the hypothetical answer, if expanding)
+       bm25:  FTS5 top 50; each query word quoted and OR-joined   (+ the keywords, if expanding)
+       hybrid (default): rrf over all the lists
   2. _rerank (default on)
        cross-encoder scores (query, chunk) for the top 20 (rerank_candidates); sort by score
   3. min_score (off by default; set by kb eval --save-threshold)
@@ -143,6 +145,8 @@ Each tool indexes the same `<doc_id>.md` files and is queried **through its own 
 | [searcher.py](../src/mcp_kb/searcher.py) | The search pipeline: retrieve, rerank, abstain, format. | `search` docstring, then `_retrieve`. |
 | [server.py](../src/mcp_kb/server.py) | MCP server (SDK v2 `MCPServer`) with `search_docs` and `list_docs`; syncs `--docs` and warms models at start. Logs go to stderr because stdout carries MCP. | `build_server`, `run`. |
 | [cli.py](../src/mcp_kb/cli.py) | The `kb` command: `index`, `search`, `serve`, `bench`, `calibrate`. | `--help` output. |
+| [expand.py](../src/mcp_kb/expand.py) | Optional query expansion: asks Ollama for keywords + a hypothetical answer, caches it next to the index, falls back to plain search if the LLM is unavailable. | `expand`. |
+| [llm.py](../src/mcp_kb/llm.py) | Ollama client (stdlib HTTP, JSON mode) used by query expansion and `kb eval`, with a clear install message if Ollama isn't running. | `ollama`. |
 | [\_\_init\_\_.py](../src/mcp_kb/__init__.py) | Runs first: switches Hugging Face to offline mode once models are cached, and quiets library logs. | `models_cached`. |
 | [tracing.py](../src/mcp_kb/tracing.py) | Optional Arize Phoenix spans for each search. Off unless `PHOENIX_ENABLED=1`. | Skip until needed. |
 
@@ -154,7 +158,6 @@ Each tool indexes the same `<doc_id>.md` files and is queried **through its own 
 | [stats.py](../src/mcp_kb/evals/stats.py) | Paired randomization test for "is this difference real?". |
 | [beir.py](../src/mcp_kb/evals/beir.py) | Download, load, index, run, save, summarize; `SETUPS` defines every ablation row; `calibrate_abstention`. |
 | [abstain.py](../src/mcp_kb/evals/abstain.py) | Chooses the "not found" threshold (balanced accuracy, or "answer at least 97%"). |
-| [llm.py](../src/mcp_kb/evals/llm.py) | Ollama client (stdlib HTTP, JSON mode) with a clear install message if it isn't running. |
 | [synth.py](../src/mcp_kb/evals/synth.py) | Writes the gold set from your chunks: prompts, overlap filter, LLM judge, save/load. |
 | [own.py](../src/mcp_kb/evals/own.py) | Scores setups on the gold set, calibrates the threshold, recommends, formats the report. |
 | [validate.py](../src/mcp_kb/evals/validate.py) | Checks `kb eval` against human-labelled BEIR (Spearman). |

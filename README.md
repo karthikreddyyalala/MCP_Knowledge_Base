@@ -79,8 +79,9 @@ Measured on three [BEIR](https://github.com/beir-cellar/beir) datasets. Each doc
 | BM25 alone | 0.685 | 0.323 | 0.241 | 123 ms |
 | Hybrid: dense + BM25, RRF | **0.711** | **0.349** | 0.346 | 124 ms |
 | **Hybrid + rerank top 20 (default)** | 0.720 | **0.364** | **0.367** | 65–325 ms |
+| + LLM query expansion, qwen2.5:7b (`--expand`) | 0.717 | 0.372 | 0.376 | ~1.5 s (p50) |
 
-Against v1 that is **+10% on SciFact and +18% on NFCorpus**; FiQA is level. Both baselines match published numbers (MiniLM dense and BM25 within about a point), which is the check that the pipeline is sound.
+Against v1 that is **+10% on SciFact and +18% on NFCorpus**; FiQA is level. Query expansion (an LLM adds keywords and a hypothetical answer before searching, the trick behind qmd's `query` mode) gave no significant gain on any dataset (best: +0.008, p = 0.10) for roughly 25× the latency, so it's opt-in via `--expand <ollama-model>`. Both baselines match published numbers (MiniLM dense and BM25 within about a point), which is the check that the pipeline is sound.
 
 ### Compared with other local tools
 
