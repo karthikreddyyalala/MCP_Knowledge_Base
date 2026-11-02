@@ -1,3 +1,7 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/docs/index.html" }]
+  "builds": [{ "src": "docs/**", "use": "@vercel/static" }],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/docs/index.html" }
+  ]
 }
