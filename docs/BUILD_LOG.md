@@ -225,7 +225,7 @@ SciFact pairwise: qmd vs kb +0.008 (p = 0.62), knowledge-rag vs kb -0.003 (p = 0
 - **Default changed from "refuse" to "warn" (found while recording the demo):** "undo a bad deployment" returned the right runbook section, but the BEIR-calibrated threshold (-6.57) refused it at score -8.3. Thresholds calibrated on one kind of text don't transfer to another. By default, results below the threshold now come with a "Low confidence" note and Claude judges; hard "not found" is opt-in through `kb eval --save-threshold` on your own docs. A test now requires three conversational paraphrases to never be hidden.
 - **Demo GIF** recorded from a script (`docs/demo.tape`, rendered with `vhs`). Reviewing frames caught zsh treating `#` narration as commands and the eval report still saying "not found" after the default changed; both fixed.
 - **README rewritten** for launch: demo, install, results with losses, comparison, evaluator validation, measured limits.
-- **Landing page** (`docs/index.html`, deployed by Vercel from `main`) still claimed "MRR 0.585 on MS MARCO, 3.5x BM25"; replaced with the BEIR results and comparison.
+- **Landing page** (`docs/index.html`; the live copy at mcp-kb-site.vercel.app is a separate, manually deployed Vercel project, so it needs a redeploy, not just a merge) still claimed "MRR 0.585 on MS MARCO, 3.5x BM25"; replaced with the BEIR results and comparison.
 - **Launch drafts:** `docs/launch/blog-post.md` and `docs/launch/posts.md` (Hacker News, LinkedIn, r/LocalLLaMA).
 
 **Decided (2026-11-01):** PyPI name `citekb` (both `kb` and `citekb` commands), MIT license.

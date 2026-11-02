@@ -162,7 +162,9 @@ Then open [BUILD_LOG.md](BUILD_LOG.md#remaining-phases-from-the-spec) for the ne
 | ~~Pick a PyPI name~~ | Done: `citekb` (commands `kb` and `citekb`) |
 | ~~Choose a license~~ | Done: MIT |
 | Create a PyPI account, add a trusted publisher for `release.yml` (steps at the top of that file), then `git tag v0.2.0 && git push --tags` | **You** |
-| Look at the updated site (`docs/index.html`) in a browser before merging | **You** |
+| Look at the updated site (`docs/index.html`) in a browser | **You** |
+| Redeploy the live site: it's a separate Vercel project (`mcp-kb-site`), not connected to GitHub, so merging does **not** update it. Run `npx vercel login`, then `cd docs && npx vercel --prod` and pick the `mcp-kb-site` project | **You** |
+| Fix or remove the GitHub-connected Vercel project `mcp-base`: it has failed on every commit (including before v2), most likely because it builds from the repo root and sees the Python project. In its Vercel settings set Root Directory to `docs`, or disconnect it | **You** |
 | Post the blog: drafts in `docs/launch/` (blog post, HN, LinkedIn, Reddit) | **You** |
 | Update the portfolio card (link `MCP_Knowledge_Base`; replace the MS MARCO claim with the numbers above) | **You** (that site's code isn't in this repo) |
 | Walk through the code with `/vibe-wise:learn` so you can explain every part | **You** |
