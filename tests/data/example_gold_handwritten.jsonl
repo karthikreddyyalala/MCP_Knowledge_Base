@@ -1,0 +1,22 @@
+{"question": "how do I get AWS access on day one", "answerable": true, "source": "onboarding.md", "start_line": 1, "end_line": 1000000}
+{"question": "what tools do I install first", "answerable": true, "source": "onboarding.md", "start_line": 1, "end_line": 1000000}
+{"question": "what is the onboarding checklist", "answerable": true, "source": "onboarding.md", "start_line": 1, "end_line": 1000000}
+{"question": "how do I set up my dev environment", "answerable": true, "source": "onboarding.md", "start_line": 1, "end_line": 1000000}
+{"question": "how do I roll back a deployment", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "what is the rollback command", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "how long does a rollback take", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "what Datadog threshold triggers a rollback", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "which Slack channel for incidents", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "what is the deploy checklist", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "how do I deploy to production", "answerable": true, "source": "deployment-runbook.md", "start_line": 1, "end_line": 1000000}
+{"question": "how do I authenticate with the API", "answerable": true, "source": "api-reference.md", "start_line": 1, "end_line": 1000000}
+{"question": "what is the bearer token format", "answerable": true, "source": "api-reference.md", "start_line": 1, "end_line": 1000000}
+{"question": "how long do tokens last", "answerable": true, "source": "api-reference.md", "start_line": 1, "end_line": 1000000}
+{"question": "how do I refresh my token", "answerable": true, "source": "api-reference.md", "start_line": 1, "end_line": 1000000}
+{"question": "what does the health endpoint return", "answerable": true, "source": "api-reference.md", "start_line": 1, "end_line": 1000000}
+{"question": "how do I upload a document", "answerable": true, "source": "api-reference.md", "start_line": 1, "end_line": 1000000}
+{"question": "where do I find the team wiki", "answerable": false, "source": null, "start_line": null, "end_line": null}
+{"question": "who do I talk to for a code review", "answerable": false, "source": null, "start_line": null, "end_line": null}
+{"question": "what Slack channels should I join", "answerable": false, "source": null, "start_line": null, "end_line": null}
+{"question": "what is the best pizza in Naples", "answerable": false, "source": null, "start_line": null, "end_line": null}
+{"question": "what is our vacation policy", "answerable": false, "source": null, "start_line": null, "end_line": null}

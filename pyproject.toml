@@ -1,22 +1,46 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-knowledge-base"
-version = "0.1.0"
+name = "citekb"
+version = "0.2.0"
+description = "Local MCP search over your markdown docs for Claude: hybrid retrieval, reranking, cited answers, and an evaluator for your own docs."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+authors = [{ name = "Karthik Reddy" }]
+keywords = ["mcp", "claude", "rag", "retrieval", "bm25", "hybrid-search", "reranking", "beir", "evaluation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=2.3,<3",
     "chromadb>=0.5.0",
     "sentence-transformers>=3.0.0",
     "typer>=0.12.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base"
+Documentation = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base/blob/main/docs/START_HERE.md"
+Results = "https://github.com/karthikreddyyalala/MCP_Knowledge_Base/blob/main/results/summary.md"
+
+[project.scripts]
+kb = "mcp_kb.cli:app"
+citekb = "mcp_kb.cli:app"  # same command; lets `uvx citekb ...` work
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 tracing = ["arize-phoenix>=4.0.0", "openinference-instrumentation>=0.1.0"]
-benchmark = ["datasets>=2.0.0", "tqdm>=4.0.0", "faiss-cpu>=1.7.0", "numpy>=1.24.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,160 +1,168 @@
 # MCP Knowledge Base
 
-![CI](https://github.com/karthikreddyyalala/MCP_Base/actions/workflows/tests.yml/badge.svg)
+![CI](https://github.com/karthikreddyyalala/MCP_Knowledge_Base/actions/workflows/tests.yml/badge.svg)
 
-**[mcp-kb-site.vercel.app](https://mcp-kb-site.vercel.app)**
+Local search over your markdown docs for Claude, with line-level citations, and an evaluator that tells you how well it works on **your** docs. Runs entirely on your machine; no API keys.
 
-Give Claude Desktop semantic search over your private markdown docs. Ask a question, get a cited answer from your actual files - nothing uploaded anywhere.
+<img src="docs/images/demo.gif" width="760" alt="kb index, a paraphrase search, an exact-string search, a low-confidence warning, and kb eval"/>
 
----
+- **Hybrid retrieval** (embeddings + BM25, fused by rank) with a **cross-encoder reranker**.
+- **Cited answers**: every chunk comes back as `[source: ops/runbook.md:L8-L14]`.
+- **Measured, not claimed**: every component is benchmarked on BEIR with significance tests, and compared head-to-head with [qmd](https://github.com/tobi/qmd) and [knowledge-rag](https://github.com/lyonzin/knowledge-rag): a tie on SciFact, behind qmd on NFCorpus, ahead of knowledge-rag, at a fraction of the latency of both.
+- **`kb eval`**: a local LLM writes test questions from your own docs and scores search on them. Validated against human-labelled data.
 
-## The problem
-
-Your team has docs. Runbooks, onboarding guides, API references. Claude has no idea they exist.
-
-You could upload them manually every conversation. But that sends your internal files to a third-party server, and you'd have to do it every time. This is the alternative: index them once locally, wire up the MCP server, and Claude can search them on its own whenever it needs to.
-
----
-
-## How it works
-
-<img src="https://raw.githubusercontent.com/karthikreddyyalala/MCP_Knowledge_Base/main/docs/images/architecture.png" width="720" alt="System architecture"/>
-
-Two steps:
-
-**Index** - run `index.py` once. It reads your `.md` files, splits them into 400-token chunks (50-token overlap so nothing gets cut mid-sentence), embeds each chunk with `all-MiniLM-L6-v2`, and saves everything to ChromaDB on your local disk. The model downloads once from HuggingFace, then all inference is offline.
-
-**Serve** - `server.py` runs in the background and registers two tools with Claude Desktop over stdio: `search_docs` and `list_docs`. When you ask Claude a question, it calls `search_docs`, gets back the top 5 relevant chunks with line citations, and answers from there.
-
-The docs never leave your machine. Only the retrieved snippet (one paragraph, basically) enters the conversation.
+New here? [docs/START_HERE.md](docs/START_HERE.md) explains the whole project on one page.
 
 ---
 
-## Quickstart
+## Install and try it
 
 ```bash
-git clone https://github.com/karthikreddyyalala/MCP_Knowledge_Base.git
-cd MCP_Knowledge_Base
-pip install -e .
+git clone https://github.com/karthikreddyyalala/MCP_Knowledge_Base.git && cd MCP_Knowledge_Base
+uv venv && uv pip install -e .
 
-python3 index.py --docs ./example-docs
+.venv/bin/kb index ./example-docs                          # build the index (later runs only re-index changed files)
+.venv/bin/kb search "when does my login token stop working"  # exactly what Claude will see
 ```
 
-Test the server starts:
+The models (~175 MB) download on first use; after that nothing touches the network. Once published to PyPI as `citekb`, `uvx citekb index ./docs` will work without cloning.
+
+## Connect to Claude
+
 ```bash
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}\n' \
-  | PYTHONPATH=. python3 src/server.py
+claude mcp add kb -- $PWD/.venv/bin/kb serve --docs /path/to/your/docs
 ```
 
----
+<details>
+<summary>Claude Desktop</summary>
 
-## Connect to Claude Desktop
-
-`~/Library/Application Support/Claude/claude_desktop_config.json` on Mac:
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "knowledge-base": {
-      "command": "python3",
-      "args": ["/absolute/path/to/src/server.py"],
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/MCP_Knowledge_Base",
-        "KB_DOCS_PATH": "/path/to/your/docs",
-        "KB_DB_PATH": "/Users/yourname/.mcp-kb/chroma"
-      }
+      "command": "/absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb",
+      "args": ["serve", "--docs", "/path/to/your/docs"]
     }
   }
 }
 ```
+</details>
 
-Restart Claude Desktop. Hammer icon appears in the chat input. Try asking: *"how do I roll back a bad deployment?"*
+With `--docs`, the server re-indexes added, edited or deleted files each time it starts, so restarting Claude picks up your changes. The index lives in `~/.mcp-kb/chroma` (change with `--db`).
 
----
+Claude gets two tools: `search_docs(query)` returns the top 5 chunks with citations, and `list_docs()` lists indexed files and pending changes. `.md` and `.txt` files are indexed.
 
-## What you get back
+## What Claude gets back
 
 ```
-[source: deployment-runbook.md:L8-L14]
-If error rate spikes, run rollback: ./scripts/rollback.sh <previous-sha>
-Takes ~3 minutes. Notify #incidents in Slack.
+[source: deployment-runbook.md:L11-L14]
+deployment-runbook > Deployment Runbook > Deploy steps
+
+3. Monitor Datadog dashboard for error rate spike (threshold: >1% over 5 min)
+4. If error rate spikes, run rollback: `./scripts/rollback.sh <previous-sha>`
 ```
 
-Line number means you can open the file and verify it. That matters more than it sounds - a system that tells you something without telling you where it came from is one you can't trust in production.
+If nothing scores as clearly relevant, the results come with a warning ("Low confidence: these may not answer the question") instead of being presented as answers.
 
 ---
 
-## Tools
+## Results
 
-| Tool | What it does |
-|------|-------------|
-| `search_docs(query)` | Semantic search, returns top-5 chunks with `[source: file.md:L42-L58]` |
-| `list_docs()` | Lists every indexed markdown file |
+Measured on three [BEIR](https://github.com/beir-cellar/beir) datasets. Each document is written to a markdown file and goes through the real `kb index` and search code, so these numbers measure the product. nDCG@10, higher is better; **bold** = significant against the row above (paired randomization test, p < 0.05).
+
+| Setup | SciFact | NFCorpus | FiQA | p95 latency |
+|---|---|---|---|---|
+| v1: 400-word chunks, dense only | 0.652 | 0.309 | 0.362 | 9 ms |
+| 256-token chunks + `path > heading` prefix | 0.659 | 0.321 | 0.356 | 8 ms |
+| BM25 alone | 0.685 | 0.323 | 0.241 | 123 ms |
+| Hybrid: dense + BM25, RRF | **0.711** | **0.349** | 0.346 | 124 ms |
+| **Hybrid + rerank top 20 (default)** | 0.720 | **0.364** | **0.367** | 65–325 ms |
+| + LLM query expansion, qwen2.5:7b (`--expand`) | 0.717 | 0.372 | 0.376 | ~1.5 s (p50) |
+
+Against v1 that is **+10% on SciFact and +18% on NFCorpus**; FiQA is level. Query expansion (an LLM adds keywords and a hypothetical answer before searching, the trick behind qmd's `query` mode) gave no significant gain on any dataset (best: +0.008, p = 0.10) for roughly 25× the latency, so it's opt-in via `--expand <ollama-model>`. Both baselines match published numbers (MiniLM dense and BM25 within about a point), which is the check that the pipeline is sound.
+
+### Compared with other local tools
+
+Same files, same queries, same scoring; each tool queried through its own MCP server with its default settings.
+
+| | SciFact nDCG@10 | NFCorpus nDCG@10 | p50 latency (SciFact) |
+|---|---|---|---|
+| [qmd](https://github.com/tobi/qmd) 2.8.3 (LLM query expansion + LLM rerank) | 0.729 | **0.383** | 7.1 s* |
+| **kb** (this repo) | 0.720 | 0.364 | **67 ms** |
+| [knowledge-rag](https://github.com/lyonzin/knowledge-rag) 4.11.1 | 0.718 | 0.338 | 224 ms |
+
+On SciFact the three are a statistical tie (all pairwise p > 0.5). On NFCorpus, qmd wins (+0.018 over kb, p = 0.02), most likely from rewriting each question with an LLM before searching, at about 85× the latency; kb beats knowledge-rag there (+0.027, p < 0.001). \*qmd's GPU (Metal) backend failed to compile on the test machine's macOS, so its latency here is likely CPU-bound and not representative. FiQA (57k docs) was not run for the other tools: qmd would need hours to embed it on this machine.
+
+### Does `kb eval` tell the truth?
+
+`kb eval` ranks search setups using questions a local LLM writes from your docs. To check it, the same thing was run on BEIR corpora, where human-written questions give the true ranking. Spearman correlation between the two rankings (1.0 = identical order):
+
+| Question writer | SciFact (prompt tuned here) | NFCorpus (held out) |
+|---|---|---|
+| llama3.2:3b | 0.4 (picked the wrong best setup) | not run |
+| qwen2.5:7b, prompt v1 | 0.8 | 0.8 |
+| **qwen2.5:7b, prompt v2 (default)** | **0.8** | **1.0** |
+
+### Limits, measured
+
+- **Synthetic questions still favour keyword search a little**: an LLM writing a question from a passage reuses its words. A word-overlap filter and the v2 prompt reduce it; it isn't gone.
+- **Relevance scores don't transfer across domains.** A threshold calibrated on BEIR (97% of answerable questions above it) flagged correct answers on short runbook text, such as "undo a bad deployment" (score −8.3 vs −6.57). So the default *warns* below the threshold instead of hiding results; `kb eval --save-threshold` calibrates a hard "not found" on your own docs if you want one.
+- **Near-misses are hard.** On-topic questions your docs don't answer often score like answerable ones; the score catches off-topic questions far better.
+
+All numbers, with Recall@10, MRR@10, latency and p-values: [results/summary.md](results/summary.md). How each was produced and what went wrong along the way: [docs/BUILD_LOG.md](docs/BUILD_LOG.md).
 
 ---
 
-## Tracing with Arize Phoenix
+## Measure it on your own docs
 
 ```bash
-pip install -e ".[tracing]"
-python3 -m phoenix.server.main serve   # opens http://localhost:6006
-PHOENIX_ENABLED=1 PYTHONPATH=. python3 src/server.py
+brew install ollama && ollama serve &   # any OS: https://ollama.com
+ollama pull qwen2.5:7b
+.venv/bin/kb eval /path/to/your/docs
 ```
 
-Shows every `search_docs` call as a retrieval span - query text, which chunks were returned, citation metadata. Useful for debugging why a bad answer came back.
+It samples chunks, writes one question each chunk answers and one on-topic question it doesn't, filters out questions that copy the text or that the docs answer elsewhere, then reports hit@5 and MRR@5 for each setup with p-values against the default, a recommendation, and a calibrated threshold. `--review` lets you spot-check questions by hand; `--gold <file>` re-scores a saved set without the LLM.
 
-Used Phoenix over RAGAS because this project is a retriever, not a generator. RAGAS measures generation quality (`faithfulness`, `answer_relevancy`) which Claude handles downstream - and it needs an API key, which breaks the offline guarantee.
+## How it works
 
----
+```mermaid
+flowchart LR
+    D[".md / .txt"] -->|"kb index: changed files only"| C["chunks of <= 256 tokens<br/>with path > heading prefix"]
+    C --> V[("embeddings<br/>ChromaDB")]
+    C --> B[("BM25<br/>SQLite FTS5")]
+    Q["question from Claude"] --> V & B
+    V -->|top 50| F["RRF fusion"]
+    B -->|top 50| F
+    F -->|top 20| R["cross-encoder rerank"]
+    R --> O["top 5 + [source: file:Lx-Ly]<br/>(warning if all scores are low)"]
+```
 
-## Decisions
-
-**ChromaDB not Pinecone** - Pinecone needs an account. ChromaDB is one pip install, stores on disk, zero setup. For a local-first tool that's the right call.
-
-**all-MiniLM-L6-v2** - 80MB, downloads once, runs offline forever. Strong enough for English prose docs.
-
-**400-token chunks, 50-token overlap** - big enough to capture a full thought, small enough to retrieve precisely. Overlap means nothing important gets split across a boundary.
-
-**Line citations not just filenames** - filenames tell you which doc. Line numbers tell you exactly where, so you can verify and notice when docs go stale.
-
----
-
-## Stack
-
-| | |
+| Decision | Why |
 |---|---|
-| MCP server | [`mcp`](https://github.com/anthropics/mcp) |
-| Vector store | [`chromadb`](https://www.trychroma.com/) |
-| Embeddings | `sentence-transformers` - `all-MiniLM-L6-v2` |
-| Observability | [Arize Phoenix](https://phoenix.arize.com/) |
-| CLI | `typer` |
+| Chunks sized in real tokens (256) | The embedding model reads 256 tokens and silently drops the rest; v1's 400-word chunks lost about half their text. |
+| Hybrid search, fused by rank | Embeddings catch paraphrases, BM25 catches exact names and codes. Their scores are on unrelated scales, so RRF merges by rank. |
+| Rerank only the top 20 | A cross-encoder reads question and chunk together: accurate but too slow for everything. 20 tied or beat 50 at half the cost. |
+| Warn, don't hide, by default | A wrong "not found" loses a real answer; a flagged weak chunk is something Claude can judge. |
+| Incremental sync by content hash | Only changed files are re-embedded; the manifest is written last, so an interrupted sync repairs itself. |
+| ChromaDB + SQLite, local models | One install, no accounts, nothing leaves the machine. |
 
----
+Every concept, file and command is explained in [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
 
-## Tests
+## Privacy and security
 
-```bash
-pytest tests/ -v
-```
+- Indexing, search, reranking, `kb eval` and query expansion all run on your machine. No API keys, no telemetry; once the models are cached nothing touches the network.
+- The server talks to Claude over stdio and opens no network port. Ollama (optional) listens on `127.0.0.1` only.
+- What leaves your machine: the chunks returned for each question become part of your Claude conversation. Don't index anything you wouldn't paste into a chat.
+- Retrieved text is read by Claude, so a document containing instructions ("ignore previous instructions...") could influence it. Index only docs you trust.
 
-10 tests - chunking logic, index construction, search result format, citation format, source listing.
-
----
-
-## Benchmark
-
-MS MARCO passage ranking, dev set. Reservoir-sampled 1.1M passages from the full 8.8M corpus (keeping all qrel-relevant passages), indexed, then evaluated MRR@10 against 6,980 official queries.
-
-```
-MRR@10 = 0.585   ████████████████████████████████████████████████████
-BM25   = 0.167   ██████████████
-
-3.5× above the keyword search baseline.
-```
-
-First run ~90 min. Subsequent runs ~20 min (cached index at `~/.mcp-kb/msmarco`).
+## Reproduce
 
 ```bash
-pip install -e ".[benchmark]"
-PYTHONPATH=. python3 scripts/eval_msmarco.py
+uv pip install -e ".[dev]" && .venv/bin/python -m pytest tests -q   # 68 tests
+.venv/bin/kb bench --dataset scifact --setup hybrid-rerank20       # any row; setups in src/mcp_kb/evals/beir.py
+.venv/bin/kb validate-eval --dataset nfcorpus                      # the kb eval check (needs ollama)
 ```
+
+Optional tracing of every search with [Arize Phoenix](https://phoenix.arize.com/): `uv pip install -e ".[tracing]"`, then run `kb serve` with `PHOENIX_ENABLED=1`.

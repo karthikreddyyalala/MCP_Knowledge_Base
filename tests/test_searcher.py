@@ -1,9 +1,9 @@
 import re
 import pytest
 from pathlib import Path
-from src.config import Settings
-from src.indexer import build_index
-from src.searcher import search, list_sources
+from mcp_kb.config import Settings
+from mcp_kb.indexer import build_index
+from mcp_kb.searcher import search, list_sources
 
 
 @pytest.fixture
@@ -45,3 +45,32 @@ def test_list_sources_returns_filenames(indexed_settings):
     sources = list_sources(indexed_settings)
     assert "deploy.md" in sources
     assert "onboarding.md" in sources
+
+
+def test_empty_index_returns_nothing(tmp_path):
+    settings = Settings(db_path=tmp_path / "empty")
+    assert search("anything", settings) == []
+    assert list_sources(settings) == []
+
+
+@pytest.mark.parametrize("mode", ["bm25", "hybrid"])
+def test_keyword_and_hybrid_modes_cite_sources(indexed_settings, mode):
+    import dataclasses
+    results = search("kubectl apply", dataclasses.replace(indexed_settings, search_mode=mode))
+    assert results and "deploy.md" in results[0]["citation"]
+    assert re.match(r"\[source: .+\.md:L\d+-L\d+\]", results[0]["citation"])
+
+
+def test_rerank_orders_by_cross_encoder_score(indexed_settings):
+    import dataclasses
+    s = dataclasses.replace(indexed_settings, rerank=True)
+    results = search("how do I deploy the app", s)
+    assert "deploy.md" in results[0]["citation"]
+    scores = [r["score"] for r in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_min_score_abstains_when_nothing_is_relevant(indexed_settings):
+    import dataclasses
+    assert search("kubectl apply", dataclasses.replace(indexed_settings, rerank=True, min_score=100.0)) == []
+    assert search("kubectl apply", dataclasses.replace(indexed_settings, rerank=True, min_score=None))

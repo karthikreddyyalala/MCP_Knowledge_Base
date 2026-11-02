@@ -409,7 +409,7 @@ body::before {
     <a href="#how">Architecture</a>
     <a href="#benchmark">Benchmark</a>
     <a href="#start">Quickstart</a>
-    <a href="https://github.com/karthikreddyyalala/MCP_Base" class="nav-gh">
+    <a href="https://github.com/karthikreddyyalala/MCP_Knowledge_Base" class="nav-gh">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
       GitHub
     </a>
@@ -453,16 +453,16 @@ body::before {
 <!-- STATS -->
 <div class="stats" id="stats">
   <div class="stat reveal">
-    <div class="stat-n" id="sn0"><span class="count-target" data-target="0.585" data-dec="3" data-dur="1400">0.000</span><sub>mrr@10</sub></div>
-    <div class="stat-l">retrieval accuracy<br>ms marco dev set</div>
+    <div class="stat-n" id="sn0"><span class="count-target" data-target="0.720" data-dec="3" data-dur="1400">0.000</span><sub>ndcg@10</sub></div>
+    <div class="stat-l">SciFact (BEIR)<br>up from 0.652 in v1</div>
   </div>
   <div class="stat reveal reveal-d1">
-    <div class="stat-n" id="sn1"><span class="count-target" data-target="3.5" data-dec="1" data-dur="1200">0.0</span><sub>×</sub></div>
-    <div class="stat-l">above keyword<br>search baseline</div>
+    <div class="stat-n" id="sn1"><span class="count-target" data-target="67" data-dec="0" data-dur="1200">0</span><sub>ms</sub></div>
+    <div class="stat-l">median search time<br>same quality as qmd</div>
   </div>
   <div class="stat reveal reveal-d2">
-    <div class="stat-n" id="sn2"><span id="big-count">0</span><sub>M</sub></div>
-    <div class="stat-l">passages benchmarked<br>6,980 queries evaluated</div>
+    <div class="stat-n" id="sn2"><span class="count-target" data-target="1.0" data-dec="1" data-dur="1200">0.0</span><sub>ρ</sub></div>
+    <div class="stat-l">kb eval vs human labels<br>held-out dataset</div>
   </div>
 </div>
 
@@ -522,25 +522,25 @@ body::before {
     <div class="step reveal reveal-d1">
       <div class="step-lhs"><div class="step-num">02</div><div class="step-line"></div></div>
       <div class="step-rhs">
-        <div class="step-title">The Indexer — index.py</div>
-        <div class="step-desc">Run once. Reads every file, cuts it into 400-word chunks with 50-word overlaps, then runs each chunk through <strong style="color:var(--txt)">all-MiniLM-L6-v2</strong> — an AI model that converts text into 384 numbers representing its meaning.</div>
-        <span class="step-badge">python3 index.py --docs ./your-docs</span>
+        <div class="step-title">The indexer — kb index</div>
+        <div class="step-desc">Cuts each file into chunks of at most <strong style="color:var(--txt)">256 tokens</strong> (exactly what the embedding model can read), labels each with its <em>file &gt; heading</em>, and files it twice: as 384 numbers capturing its meaning, and as words for keyword search. Re-runs only touch files whose content changed.</div>
+        <span class="step-badge">kb index ./your-docs</span>
       </div>
     </div>
     <div class="step reveal reveal-d2">
       <div class="step-lhs"><div class="step-num">03</div><div class="step-line"></div></div>
       <div class="step-rhs">
-        <div class="step-title">ChromaDB — the vector store</div>
-        <div class="step-desc">All those number-lists get saved to a local database on your disk. ChromaDB is a filing cabinet that's very fast at finding "which documents have numbers closest to this search?" Nothing goes online.</div>
+        <div class="step-title">Two catalogues on your disk</div>
+        <div class="step-desc">Meanings go into ChromaDB, words into a BM25 index in SQLite. Meaning search finds paraphrases ("undo a deploy" → "rollback"); keyword search finds exact names and codes. Nothing goes online.</div>
         <span class="step-badge">~/.mcp-kb/chroma/ — local disk only</span>
       </div>
     </div>
     <div class="step reveal reveal-d3">
       <div class="step-lhs"><div class="step-num">04</div><div class="step-line"></div></div>
       <div class="step-rhs">
-        <div class="step-title">The MCP Server — server.py</div>
-        <div class="step-desc">Runs in the background, listens for Claude Desktop. Exposes two tools: <span style="color:var(--em);font-family:var(--fs-m);font-size:.82em">search_docs</span> (semantic search) and <span style="color:var(--em);font-family:var(--fs-m);font-size:.82em">list_docs</span> (show what exists). Speaks MCP protocol over stdio.</div>
-        <span class="step-badge">python3 src/server.py — stdio transport</span>
+        <div class="step-title">The MCP server — kb serve</div>
+        <div class="step-desc">Runs in the background, listens for Claude Desktop. Exposes two tools: <span style="color:var(--em);font-family:var(--fs-m);font-size:.82em">search_docs</span> (top 50 by meaning + top 50 by words, merged by rank, then a careful re-read of the top 20 by a reranker) and <span style="color:var(--em);font-family:var(--fs-m);font-size:.82em">list_docs</span>. If nothing scores as clearly relevant, it says so.</div>
+        <span class="step-badge">kb serve --docs ./your-docs — stdio transport</span>
       </div>
     </div>
     <div class="step reveal">
@@ -560,15 +560,15 @@ body::before {
   <div class="big-inner">
     <div>
       <div class="big-num" id="big-mrr">0</div>
-      <div class="big-label">MRR@10 · MS MARCO · 1.1M passages · 6,980 queries</div>
+      <div class="big-label">nDCG@10 · SciFact (BEIR) · 300 human-written questions</div>
     </div>
     <div class="big-context reveal">
       <div class="eyebrow">Measured, not claimed</div>
-      <h3>3.5× better than<br>keyword search.</h3>
+      <h3>Measured honestly,<br>losses included.</h3>
       <p style="color:var(--txt2);font-size:.9rem;line-height:1.76;margin-top:.75rem">
-        MRR@10 (Mean Reciprocal Rank) measures: when you search, does the right answer appear in your top 10 results — and how high up? Score of 1.0 = always first.
+        nDCG@10 asks: when you search, are the right documents at the very top? 1.0 = perfect ranking.
         <br><br>
-        BM25, the same tech as old-school keyword search, scores <strong style="color:var(--txt)">0.167</strong>. This project scores <strong style="color:var(--em)">0.585</strong> — on 1.1 million real passages, 6,980 real queries from the MS MARCO benchmark.
+        Every change was benchmarked on three public BEIR datasets and kept only if a significance test said the gain was real: <strong style="color:var(--em)">+10%</strong> on SciFact and <strong style="color:var(--em)">+18%</strong> on NFCorpus over v1, level on FiQA. The results page also lists what didn't work.
       </p>
     </div>
   </div>
@@ -579,38 +579,53 @@ body::before {
   <div class="bench">
     <div class="reveal">
       <div class="bench-score">
-        <div class="bench-score-num">0.585</div>
-        <div class="bench-score-label">MRR@10</div>
+        <div class="bench-score-num">0.720</div>
+        <div class="bench-score-label">nDCG@10</div>
       </div>
       <div class="bench-meta">
-        <div class="bench-kv"><div class="bk-k">Dataset</div><div class="bk-v">MS MARCO Passage Ranking (dev)</div></div>
-        <div class="bench-kv"><div class="bk-k">Corpus</div><div class="bk-v">1,100,000 passages</div></div>
-        <div class="bench-kv"><div class="bk-k">Queries</div><div class="bk-v">6,980 official dev queries</div></div>
-        <div class="bench-kv"><div class="bk-k">Index</div><div class="bk-v">FAISS IndexFlatIP (cosine)</div></div>
+        <div class="bench-kv"><div class="bk-k">Dataset</div><div class="bk-v">SciFact, BEIR test split</div></div>
+        <div class="bench-kv"><div class="bk-k">Corpus</div><div class="bk-v">5,183 scientific abstracts</div></div>
+        <div class="bench-kv"><div class="bk-k">Queries</div><div class="bk-v">300 human-written questions</div></div>
+        <div class="bench-kv"><div class="bk-k">Fairness</div><div class="bk-v">same files, queries and scoring for every tool</div></div>
       </div>
     </div>
     <div class="bars reveal reveal-d1">
       <div class="bar-item">
         <div class="bar-row">
-          <span class="bar-name">all-MiniLM-L6-v2 (this project)</span>
-          <span class="bar-val">0.585</span>
+          <span class="bar-name">qmd (LLM expansion + rerank) · 7.1 s per search</span>
+          <span class="bar-val">0.729</span>
         </div>
-        <div class="bar-track"><div class="bar-fill fill-em" id="b1"></div></div>
+        <div class="bar-track"><div class="bar-fill fill-dim" data-w="72.9%"></div></div>
       </div>
       <div class="bar-item">
         <div class="bar-row">
-          <span class="bar-name">BM25 — keyword search baseline</span>
-          <span class="bar-val">0.167</span>
+          <span class="bar-name">kb, this project · 67 ms per search</span>
+          <span class="bar-val">0.720</span>
         </div>
-        <div class="bar-track"><div class="bar-fill fill-dim" id="b2"></div></div>
+        <div class="bar-track"><div class="bar-fill fill-em" data-w="72.0%"></div></div>
       </div>
       <div class="bar-item">
         <div class="bar-row">
-          <span class="bar-name">Score of 0 — never in top 10</span>
-          <span class="bar-val">0.000</span>
+          <span class="bar-name">knowledge-rag · 224 ms per search</span>
+          <span class="bar-val">0.718</span>
         </div>
-        <div class="bar-track"><div class="bar-fill fill-dim" style="width:1%;opacity:.3"></div></div>
+        <div class="bar-track"><div class="bar-fill fill-dim" data-w="71.8%"></div></div>
       </div>
+      <div class="bar-item">
+        <div class="bar-row">
+          <span class="bar-name">BM25 keyword search alone</span>
+          <span class="bar-val">0.685</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill fill-dim" data-w="68.5%"></div></div>
+      </div>
+      <div class="bar-item">
+        <div class="bar-row">
+          <span class="bar-name">v1 of this project</span>
+          <span class="bar-val">0.652</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill fill-dim" data-w="65.2%"></div></div>
+      </div>
+      <p style="color:var(--txt2);font-size:.8rem;line-height:1.6;margin-top:1rem">The top three are a statistical tie (p &gt; 0.5). On NFCorpus, qmd is ahead (0.383 vs 0.364, p = 0.02) thanks to LLM query rewriting, at about 85× the latency. qmd's GPU backend failed to compile on the test machine, so its latency is likely CPU-bound.</p>
     </div>
   </div>
 </section>
@@ -666,19 +681,19 @@ body::before {
   <div class="code-card reveal">
     <div class="code-hdr"><span class="code-hdr-dot"></span>Terminal</div>
     <div class="code-body"><pre><span class="cc"># 1. Clone and install</span>
-<span class="ca">git clone</span> https://github.com/karthikreddyyalala/MCP_Base.git
-<span class="ca">cd</span> MCP_Base &amp;&amp; <span class="ca">pip install</span> -e .
+<span class="ca">git clone</span> https://github.com/karthikreddyyalala/MCP_Knowledge_Base.git
+<span class="ca">cd</span> MCP_Knowledge_Base &amp;&amp; <span class="ca">uv venv</span> &amp;&amp; <span class="ca">uv pip install</span> -e .
 
 <span class="cc"># 2. Index your docs (once)</span>
-<span class="ca">python3 index.py</span> --docs ./your-docs
+<span class="ca">.venv/bin/kb index</span> ./your-docs
 
 <span class="cc"># 3. Add to Claude Desktop</span>
 <span class="cc"># ~/Library/Application Support/Claude/claude_desktop_config.json</span>
 <span class="ck">{</span>
   <span class="cam">"mcpServers"</span>: {
     <span class="cam">"knowledge-base"</span>: {
-      <span class="cam">"command"</span>: <span class="cs">"python3"</span>,
-      <span class="cam">"args"</span>: [<span class="cs">"/absolute/path/to/MCP_Base/src/server.py"</span>]
+      <span class="cam">"command"</span>: <span class="cs">"/absolute/path/to/MCP_Knowledge_Base/.venv/bin/kb"</span>,
+      <span class="cam">"args"</span>: [<span class="cs">"serve"</span>, <span class="cs">"--docs"</span>, <span class="cs">"/path/to/your-docs"</span>]
     }
   }
 <span class="ck">}</span>
@@ -693,7 +708,7 @@ body::before {
 <footer>
   <div class="foot-l">Built by <span>Karthik Reddy Yalala</span> · ASU Computer Science · May 2027</div>
   <div class="foot-r">
-    <a href="https://github.com/karthikreddyyalala/MCP_Base">GitHub</a>
+    <a href="https://github.com/karthikreddyyalala/MCP_Knowledge_Base">GitHub</a>
     <a href="#what">Explained</a>
     <a href="#benchmark">Benchmark</a>
   </div>
@@ -729,7 +744,7 @@ initStars(); drawStars();
 window.addEventListener('resize', initStars);
 
 /* ── MARQUEE ────────────────────────────── */
-const items = ['all-MiniLM-L6-v2','ChromaDB','FAISS IndexFlatIP','stdio transport','MRR@10 · 0.585','sentence-transformers','Arize Phoenix','cosine similarity','6,980 queries','400-token chunks'];
+const items = ['hybrid search','BM25 + embeddings','reciprocal rank fusion','cross-encoder rerank','nDCG@10 · 0.720','256-token chunks','line citations','kb eval','paired significance tests','runs offline'];
 const mq = document.getElementById('mq');
 const row = items.map(t => `<span class="marq-item">${t}<span class="marq-sep">·</span></span>`).join('');
 mq.innerHTML = row + row; // duplicate for seamless loop
@@ -743,10 +758,10 @@ document.querySelectorAll('.word-inner').forEach(el => {
 const lines = [
   {t:'p', v:'search_docs("how do I roll back a bad deploy?")'},
   {t:'b'},
-  {t:'g', v:'[source: deployment-runbook.md:L8–L14]'},
+  {t:'g', v:'[source: deployment-runbook.md:L11–L14]'},
   {t:'o', v:'If error rate spikes, run rollback:'},
   {t:'o', v:'  ./scripts/rollback.sh <previous-sha>'},
-  {t:'o', v:'Takes ~3 min. Notify #incidents in Slack.'},
+  {t:'o', v:'(top 5 chunks, each with file and line numbers)'},
   {t:'b'},
   {t:'p', v:'list_docs()'},
   {t:'b'},
@@ -756,9 +771,9 @@ const lines = [
   {t:'b'},
   {t:'p', v:'search_docs("what auth does the API use?")'},
   {t:'b'},
-  {t:'g', v:'[source: api-reference.md:L42–L51]'},
+  {t:'g', v:'[source: api-reference.md:L5–L11]'},
   {t:'o', v:'Bearer token in Authorization header.'},
-  {t:'o', v:'Tokens expire after 24h; rotate via /auth/refresh.'},
+  {t:'o', v:'Tokens expire after 24 hours. Refresh via POST /auth/refresh.'},
 ];
 const tb = document.getElementById('tb');
 let li=0, ci=0;
@@ -827,44 +842,12 @@ const cio = new IntersectionObserver(entries => {
 }, {threshold:.5});
 document.querySelectorAll('.count-target').forEach(el => cio.observe(el));
 
-/* ── 1.1M DRAMATIC COUNTER ───────────────── */
-const bigCount = document.getElementById('big-count');
-const sn2 = document.getElementById('sn2');
-function animMillions(el, container) {
-  // counts 0 → 1,100,000 displayed as 0.0 → 1.1M with turbo speed
-  const dur = 2200;
-  const start = performance.now();
-  function step(now) {
-    const t = Math.min((now - start) / dur, 1);
-    // custom easing: fast start, slow finish — like a slot machine
-    const ease = t < 0.7
-      ? (t / 0.7) * 0.92                         // quick rush to 92%
-      : 0.92 + (1 - 0.92) * ((t - 0.7) / 0.3);  // slow crawl to 100%
-    const val = ease * 1.1;
-    el.textContent = val.toFixed(1);
-    if (t < 1) {
-      requestAnimationFrame(step);
-    } else {
-      el.textContent = '1.1';
-      // slam landing effect
-      container.classList.add('landed');
-      setTimeout(() => container.classList.remove('landed'), 700);
-    }
-  }
-  requestAnimationFrame(step);
-}
-const mio = new IntersectionObserver(entries => {
-  if (!entries[0].isIntersecting) return;
-  animMillions(bigCount, sn2);
-  mio.unobserve(entries[0].target);
-}, {threshold: .5});
-mio.observe(sn2);
 
 /* ── BIG MRR COUNTER ─────────────────────── */
 const bigMrr = document.getElementById('big-mrr');
 const bioMrr = new IntersectionObserver(entries => {
   if(!entries[0].isIntersecting) return;
-  animCount(bigMrr, 0.585, 3, 1800);
+  animCount(bigMrr, 0.720, 3, 1800);
   bioMrr.unobserve(bigMrr);
 }, {threshold:.5});
 bioMrr.observe(bigMrr);
@@ -873,8 +856,7 @@ bioMrr.observe(bigMrr);
 const barsIo = new IntersectionObserver(entries => {
   if(!entries[0].isIntersecting) return;
   setTimeout(() => {
-    document.getElementById('b1').style.width='100%';
-    document.getElementById('b2').style.width='28.5%';
+    document.querySelectorAll('.bar-fill[data-w]').forEach(b => { b.style.width = b.dataset.w; });
   }, 300);
   barsIo.unobserve(entries[0].target);
 }, {threshold:.4});

@@ -1,8 +1,0 @@
-pyproject.toml
-src/__init__.py
-src/config.py
-src/mcp_knowledge_base.egg-info/PKG-INFO
-src/mcp_knowledge_base.egg-info/SOURCES.txt
-src/mcp_knowledge_base.egg-info/dependency_links.txt
-src/mcp_knowledge_base.egg-info/requires.txt
-src/mcp_knowledge_base.egg-info/top_level.txt
